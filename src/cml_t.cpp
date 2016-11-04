@@ -7,8 +7,8 @@
 #include <gsl/gsl_fft.h>
 
 //#include "dft.cpp"
-#define CML_INTE 1
-#define CML_NUM 180
+#define CML_INTE 6
+#define CML_NUM 30
 //int CML_NUM*int CML_LINE=180
 #define CML_SIZE 140
 /*int main()*/
@@ -63,7 +63,7 @@ void cml_help_max(tmat chm){
 	//int cml_inte=180/CML_INTE;
 	for(i=0;i<CML_NUM;i++){
 		float k=tan(i*theta+0.0001);
-		printf("k %f\n",k);
+		//printf("k %f\n",k);
 		if (k<1.0003 and k>0)
 		{
 			for (j=0;j<CML_SIZE;j++){
@@ -90,7 +90,7 @@ void cml_help_max(tmat chm){
 	}
 	
 }
-void createSinogram(sinogram s,tmat &mi,mrcMat &mM)
+void createSinogramold(sinogram s,tmat &mi,mrcMat &mM)
 {
 	int i=0;
 	int j=0;
@@ -102,33 +102,44 @@ void createSinogram(sinogram s,tmat &mi,mrcMat &mM)
 	}
 }
 
-void createSinogramave(sinogram s,tmat &mi,mrcMat &mM)
+void createSinogram(sinogram s,tmat &mi,mrcMat &mM)
 {
 	int i=0;
 	int j=0;
 	for (i=0;i<CML_NUM;i++)
 	{
 		for (j=0;j<CML_SIZE;j++){
-			if ( mi[i][j].x*mi[i][j].y!=0 and mi[i][j].x!=CML_SIZE and mi[i][j].y!=CML_SIZE){
+			if ( mi[i][j].x*mi[i][j].y!=0 and mi[i][j].x!=CML_SIZE-1 and mi[i][j].y!=CML_SIZE-1){
 			
-			s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/9.0	
+			s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/9.0;	
 			}
-			else if ( mi[i][j].x==0 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE){
+			else if ( mi[i][j].x==0 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
 			//no x-1
 				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;
 			}
-			else if ( mi[i][j].x==CML_SIZE and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE){
+			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
 			// no x+1
 				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1])/6.0;	
 			}
 			else if ( mi[i][j].y==0 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE){
 			// no y-1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/9.0;	
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;	
 			}
-			else if ( mi[i][j].y==CML_SIZE and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE){
+			else if ( mi[i][j].y==CML_SIZE-1 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE-1){
 			// no y+1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y])/6.0;
-			
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y])/6.0;
+			}
+			else if ( mi[i][j].x==0 and mi[i][j].y==0){
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1])/4.0;
+			}
+			else if ( mi[i][j].x==0 and mi[i][j].y==CML_SIZE-1){
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y-1])/4.0;
+			}
+			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==0){
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x-1][mi[i][j].y+1])/4.0;
+			}
+			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==CML_SIZE-1){
+				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y-1])/4.0;
 			}
 		}
 	}
@@ -169,10 +180,16 @@ void testsino(){
 	cml_help_max(m);
 	for (i=0;i<CML_SIZE;i++){
 		for (j=0;j<CML_SIZE;j++){
-			if (i+j==CML_SIZE or i+j==CML_SIZE-1 or i+j==CML_SIZE+1){
-				mM[i][j]=50;
-			}
-			else mM[i][j]=0;
+			//if (i+j==CML_SIZE [>or i+j==CML_SIZE-1 or i+j==CML_SIZE+1<]){
+				//mM[i][j]=50;
+			//}
+			//else mM[i][j]=0;
+			mM[i][j]=200;
+		}
+	}
+	for (i=40;i<70;i++){
+		for (j=50;j<80;j++){
+			mM[i][j]=0;
 		}
 	}
 	for (i=0;i<CML_NUM;i++){
@@ -224,7 +241,7 @@ int main()
 	//}
 //	float *pt=datap;
 //	/*normalize matrix before sinogram*/
-	getsubmrc(datap,0,0,mM,header);	
+	getsubmrc(datap,332,120,mM,header);	
 	/*cv::Mat xm=cv::Mat(head_row,head_col,CV_32FC1,datap);*/
 	//cv::Mat xm2;
 	//xm2=MrcProcess::Gauss_Equal_Norm(xm);
@@ -234,7 +251,7 @@ int main()
 	xm3=MrcProcess::Gauss_Equal_Norm(xm_origin);
 	//printf("\nafter norm mM\t %f",mM[0][0]);
 	//MrcProcess::showimagecpp(xm);
-	//MrcProcess::showimagecpp(xm_origin);
+	MrcProcess::showimagecpp(xm_origin);
 	//MrcProcess::showimagecpp(xm2);
 	MrcProcess::showimagecpp(xm3);
    /* for (i=0;i<CML_SIZE;i++){*/
@@ -261,11 +278,12 @@ int main()
 		}
 		printf("\n");
 	}
-	cv::Mat sino=cv::Mat(CML_NUM,CML_SIZE,CV_8U,s);
+	cv::Mat sino=cv::Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
 	//cv::Mat sino2;
 	//sino=MrcProcess::Gauss_Equal_Norm(sino);
-	cv::Mat sino2=MrcProcess::mynorm(sino);
-	MrcProcess::showimagecpp(sino2);
+	//cv::Mat sino2=MrcProcess::mynorm(sino);
+	MrcProcess::showimagecpp(sino);
+	sino.convertTo(sino,)//start here 11.5
 	printf("\nafter norm sinogram\n");
 	for (i=0;i<CML_NUM;i++)
 	{
