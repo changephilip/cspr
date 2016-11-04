@@ -1,4 +1,4 @@
-configure the compiler options
+#configure the compiler options
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -O2 -std=c++11")
 
 #set required package
@@ -26,3 +26,10 @@ target_link_libraries(libmrcprocess ${OpenCV_LIBS})
 add_executable(PickerCNN PickerCNN.cpp)
 target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 
+
+#test program
+#add_executable(dft dft.cpp)
+#target_link_libraries(dft ${OpenCV_LIBS})
+
+add_executable(cmlt cml_t.cpp)
+target_link_libraries(cmlt libmrcprocess)
