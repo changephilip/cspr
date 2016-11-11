@@ -5,12 +5,15 @@
 #include <iostream>
 #include <math.h>
 #include <gsl/gsl_fft.h>
-
+//#include <fftw3.h>
+#include "fftw3.h"
 //#include "dft.cpp"
-#define CML_INTE 6
-#define CML_NUM 30
+#define CML_INTE 2
+#define CML_NUM 90
 //int CML_NUM*int CML_LINE=180
 #define CML_SIZE 140
+#define HALF_CML_SIZE 71
+using namespace cv;
 /*int main()*/
 //{
 	//FILE *f;
@@ -199,11 +202,69 @@ void testsino(){
 		printf("\n");
 	}
 	createSinogram(s,m,mM);
-	cv::Mat xm_origin=cv::Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
+	Mat xm_origin=Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
 	MrcProcess::showimagecpp(xm_origin);
-	cv::Mat xms=cv::Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
+	Mat xms=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
 	MrcProcess::showimagecpp(xms);
 }
+Mat imdft(Mat &I)
+{
+	
+	if ( I.empty() )
+		//return -1;
+		printf("no image error");
+		Mat padded;
+		int m = getOptimalDFTSize(I.rows);
+		int n = getOptimalDFTSize(I.cols);
+		copyMakeBorder(I,padded,0,m- I.rows,0,n-I.cols,BORDER_CONSTANT,Scalar::all(0));
+		
+		Mat planes[] = {Mat_<float>(padded),Mat::zeros(padded.size(),CV_32F)};
+		Mat complexI;
+		merge(planes,2,complexI);
+
+		dft(complexI,complexI);
+		
+		split(complexI,planes);
+		magnitude(planes[0],planes[1],planes[0]);
+		Mat magI = planes[0];
+
+		magI += Scalar::all(1);
+		log(magI,magI);
+
+		magI= magI(Rect(0,0,magI.cols & -2 ,magI.rows & -2));
+		int cx = magI.cols/2;
+		int cy = magI.rows/2;
+
+		Mat q0(magI,Rect(0,0,cx,cy));
+		Mat q1(magI,Rect(cx,0,cx,cy));
+		Mat q2(magI,Rect(0,cy,cx,cy));
+		Mat q3(magI,Rect(cx,cy,cx,cy));
+
+		Mat tmp;
+		q0.copyTo(tmp);
+		q3.copyTo(q0);
+		tmp.copyTo(q3);
+
+		q1.copyTo(tmp);
+		q2.copyTo(q1);
+		tmp.copyTo(q2);
+
+		normalize(magI,magI,0,1,CV_MINMAX);
+		
+		//imshow("Input Image",I);
+		//imshow("spectrum magnitude",magI);
+		//MrcProcess::showimagecpp(magI);	
+		printf("\nmagI.cols %d magI.rows %d\n",magI.cols,magI.rows);
+		if (magI.isContinuous()){
+			printf("isContinuous\n");
+		}
+		else printf("not isContinuous\n");
+		//magI.copyTo(I);
+		return magI;
+}
+
+
+
 int main()
 {
 	tmat m;	
@@ -246,14 +307,14 @@ int main()
 	//cv::Mat xm2;
 	//xm2=MrcProcess::Gauss_Equal_Norm(xm);
 	//printf("\nbefore norm mM\t %f",mM[0][0]);
-	cv::Mat xm_origin=cv::Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
-	cv::Mat xm3;
-	xm3=MrcProcess::Gauss_Equal_Norm(xm_origin);
+	//cv::Mat xm_origin=cv::Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
+	//cv::Mat xm3;
+	//xm3=MrcProcess::Gauss_Equal_Norm(xm_origin);
 	//printf("\nafter norm mM\t %f",mM[0][0]);
 	//MrcProcess::showimagecpp(xm);
-	MrcProcess::showimagecpp(xm_origin);
+	//MrcProcess::showimagecpp(xm_origin);
 	//MrcProcess::showimagecpp(xm2);
-	MrcProcess::showimagecpp(xm3);
+	//MrcProcess::showimagecpp(xm3);
    /* for (i=0;i<CML_SIZE;i++){*/
 		//for (j=0;j<CML_SIZE;j++){
 			//printf("%f,",mM[i][j]);
@@ -268,35 +329,51 @@ int main()
 	//for (i=0;i<CML_SIZE;i++){
 		//printf("%f,",datap[i]);
 	/*}*/
+	Mat mMim=Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
+	//float tma=mM[0][0];
+	Mat after_dft;
+	after_dft=imdft(mMim);
+	//float *a;
+	//*a=after_dft.data;
+	MrcProcess::showimagecpp(after_dft);
+	//float tmb=mM[0][0];
+	//if (tma!=tmb){
+		//printf("not equal");
+	//}
+	//fftw_plan p;
+	//p = fftw_plan_dft_2d(CML_SIZE,CML_SIZE,mM,mM);
+	//fftw_execute(p);
 	createSinogram(s,m,mM);
 	printf("\nsinogram\n");
-	for (i=0;i<CML_NUM;i++)
-	{
-		for (j=0;j<CML_SIZE;j++)
-		{
-			printf("%f,",s[i][j]);
-		}
-		printf("\n");
-	}
-	cv::Mat sino=cv::Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
+	//for (i=0;i<CML_NUM;i++)
+	//{
+		//for (j=0;j<CML_SIZE;j++)
+		//{
+			//printf("%f,",s[i][j]);
+		//}
+		//printf("\n");
+	//}
+	Mat sino=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
 	//cv::Mat sino2;
 	//sino=MrcProcess::Gauss_Equal_Norm(sino);
 	//cv::Mat sino2=MrcProcess::mynorm(sino);
 	MrcProcess::showimagecpp(sino);
-	sino.convertTo(sino,)//start here 11.5
-	printf("\nafter norm sinogram\n");
-	for (i=0;i<CML_NUM;i++)
-	{
-		for (j=0;j<CML_SIZE;j++)
-		{
-			printf("%f,",s[i][j]);
-		}
-		printf("\n");
-	}
-
+	Mat sino2;
+	sino2=MrcProcess::mynorm(sino);
+	//sino.convertTo(sino,CV_8UC1,1,0);//start here 11.5
+	MrcProcess::showimagecpp(sino2);
+	//printf("\nafter norm sinogram\n");
+	//for (i=0;i<CML_NUM;i++)
+	//{
+		//for (j=0;j<CML_SIZE;j++)
+		//{
+			//printf("%f,",s[i][j]);
+		//}
+		//printf("\n");
+	//}
 	//tuple (*pm)[60][CML_SIZE];
 	//pm=&m;
 	delete[] datap;
-	testsino();
+	//testsino();
 	return 0;
 }

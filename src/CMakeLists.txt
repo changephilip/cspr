@@ -5,6 +5,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -O2 -std=c++11")
 ##first find PkgConfig
 #find_package(PkgConfig)
 find_package(OpenCV REQUIRED)
+#find_package(FFTW3 REQUIRED)
 #pkg_check_modules(cv opencv)
 #include_directories(${cv_INCLUDE_DIRS})
 #link_directories(${cv_LIBRARYS})
@@ -32,4 +33,4 @@ target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 #target_link_libraries(dft ${OpenCV_LIBS})
 
 add_executable(cmlt cml_t.cpp)
-target_link_libraries(cmlt libmrcprocess)
+target_link_libraries(cmlt libmrcprocess )
