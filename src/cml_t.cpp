@@ -7,12 +7,13 @@
 #include <gsl/gsl_fft.h>
 //#include <fftw3.h>
 #include "fftw3.h"
+#include "opencv2/imgproc/imgproc_c.h"
 //#include "dft.cpp"
-#define CML_INTE 2
-#define CML_NUM 90
+//#define CML_INTE 2
+//#define CML_NUM 90
 //int CML_NUM*int CML_LINE=180
-#define CML_SIZE 140
-#define HALF_CML_SIZE 71
+//#define CML_SIZE 140
+//#define HALF_CML_SIZE 71
 using namespace cv;
 /*int main()*/
 //{
@@ -48,120 +49,122 @@ typedef struct {
 		int x;
 		int y;
 		}tuple;
-typedef float sinogram[CML_NUM][CML_SIZE];	
-typedef tuple tmat[CML_NUM][CML_SIZE];
-typedef float mrcMat[CML_SIZE][CML_SIZE];
-void cml_help_max(tmat chm){
-	/*this function should be used to create line of matrix*/
-	/*according to the matrix's value,we calculate the line of mrc matrix*/
-	/*defaultly,we will have 60 lines in one projection,the size of line is CML_SIZE*/
-	/*struct tuple matrix can't be returned*/
-	/*so the code should be insert beside other code*/
-	//struct tuple m[60][CML_SIZE];
-	float theta=3.1415926/float(CML_NUM);
-	printf("theta %f",theta);
-	int i=0;
-	int j=0;
-	printf("\ncml_help_mat\n");
-	//int cml_inte=180/CML_INTE;
-	for(i=0;i<CML_NUM;i++){
-		float k=tan(i*theta+0.0001);
-		//printf("k %f\n",k);
-		if (k<1.0003 and k>0)
-		{
-			for (j=0;j<CML_SIZE;j++){
-				chm[i][j].y=CML_SIZE-j;
-				chm[i][j].x=int(k*(j)+(CML_SIZE+1)*(1-k)/2.0+0.5);
-				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
-				}
-		}
-		else if (k>1.0003 or k<-1.0003){
-			for (j=CML_SIZE-1;j>=0;j--){
-				chm[i][j].x=j;
-				chm[i][j].y=CML_SIZE-int(((j)+(CML_SIZE+1)*(k-1)/2.0)/k+0.5);
-				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
-				}	
-			}
-		else {
-			for (j=CML_SIZE-1;j>=0;j--){
-				chm[i][j].y=CML_SIZE-j;
-				chm[i][j].x=int(k*(j)+(CML_SIZE+1)*(1-k)/2.0+0.5);
-				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
-			}
+//typedef float sinogram[CML_NUM][CML_SIZE];
+//typedef tuple tmat[CML_NUM][CML_SIZE];
+//typedef float mrcMat[CML_SIZE][CML_SIZE];
+//void cml_help_max(tmat chm){
+//	/*this function should be used to create line of matrix*/
+//	/*according to the matrix's value,we calculate the line of mrc matrix*/
+//	/*defaultly,we will have 60 lines in one projection,the size of line is CML_SIZE*/
+//	/*struct tuple matrix can't be returned*/
+//	/*so the code should be insert beside other code*/
+//	//struct tuple m[60][CML_SIZE];
+//	float theta=3.1415926/float(CML_NUM);
+//	printf("theta %f",theta);
+//	int i=0;
+//	int j=0;
+//	printf("\ncml_help_mat\n");
+//	//int cml_inte=180/CML_INTE;
+//	for(i=0;i<CML_NUM;i++){
+//		float k=tan(i*theta+0.0001);
+//		//printf("k %f\n",k);
+//		if (k<1.0003 and k>0)
+//		{
+//			for (j=0;j<CML_SIZE;j++){
+//				chm[i][j].y=CML_SIZE-j;
+//				chm[i][j].x=int(k*(j)+(CML_SIZE+1)*(1-k)/2.0+0.5);
+//				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
+//				}
+//		}
+//		else if (k>1.0003 or k<-1.0003){
+//			for (j=CML_SIZE-1;j>=0;j--){
+//				chm[i][j].x=j;
+//				chm[i][j].y=CML_SIZE-int(((j)+(CML_SIZE+1)*(k-1)/2.0)/k+0.5);
+//				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
+//				}
+//			}
+//		else {
+//			for (j=CML_SIZE-1;j>=0;j--){
+//				chm[i][j].y=CML_SIZE-j;
+//				chm[i][j].x=int(k*(j)+(CML_SIZE+1)*(1-k)/2.0+0.5);
+//				//std::cout<<k<<","<<i<<","<<j<<","<<chm[i][j].x<<","<<chm[i][j].y<<std::endl;
+//			}
 		
-		}
-	}
+//		}
+//	}
 	
-}
-void createSinogramold(sinogram s,tmat &mi,mrcMat &mM)
-{
-	int i=0;
-	int j=0;
-	for (i=0;i<CML_NUM;i++)
-	{
-		for (j=0;j<CML_SIZE;j++){
-			s[i][j]=mM[mi[i][j].x][mi[i][j].y];	
-		}
-	}
-}
+//}
+//void createSinogramold(sinogram s,tmat &mi,mrcMat &mM)
+//{
+//	int i=0;
+//	int j=0;
+//	for (i=0;i<CML_NUM;i++)
+//	{
+//		for (j=0;j<CML_SIZE;j++){
+//			s[i][j]=mM[mi[i][j].x][mi[i][j].y];
+//		}
+//	}
+//}
 
-void createSinogram(sinogram s,tmat &mi,mrcMat &mM)
-{
-	int i=0;
-	int j=0;
-	for (i=0;i<CML_NUM;i++)
-	{
-		for (j=0;j<CML_SIZE;j++){
-			if ( mi[i][j].x*mi[i][j].y!=0 and mi[i][j].x!=CML_SIZE-1 and mi[i][j].y!=CML_SIZE-1){
+//void createSinogram(sinogram s,tmat &mi,mrcMat &mM)
+//{
+//	int i=0;
+//	int j=0;
+//	for (i=0;i<CML_NUM;i++)
+//	{
+//		for (j=0;j<CML_SIZE;j++){
+//			if ( mi[i][j].x*mi[i][j].y!=0 and mi[i][j].x!=CML_SIZE-1 and mi[i][j].y!=CML_SIZE-1){
 			
-			s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/9.0;	
-			}
-			else if ( mi[i][j].x==0 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
-			//no x-1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;
-			}
-			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
-			// no x+1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1])/6.0;	
-			}
-			else if ( mi[i][j].y==0 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE){
-			// no y-1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;	
-			}
-			else if ( mi[i][j].y==CML_SIZE-1 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE-1){
-			// no y+1
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y])/6.0;
-			}
-			else if ( mi[i][j].x==0 and mi[i][j].y==0){
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1])/4.0;
-			}
-			else if ( mi[i][j].x==0 and mi[i][j].y==CML_SIZE-1){
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y-1])/4.0;
-			}
-			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==0){
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x-1][mi[i][j].y+1])/4.0;
-			}
-			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==CML_SIZE-1){
-				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y-1])/4.0;
-			}
-		}
-	}
-}
+//			s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/9.0;
+//			}
+//			else if ( mi[i][j].x==0 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
+//			//no x-1
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;
+//			}
+//			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y!=0 and mi[i][j].y!=CML_SIZE-1){
+//			// no x+1
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x][mi[i][j].y+1])/6.0;
+//			}
+//			else if ( mi[i][j].y==0 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE){
+//			// no y-1
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y+1]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1])/6.0;
+//			}
+//			else if ( mi[i][j].y==CML_SIZE-1 and mi[i][j].x!=0 and mi[i][j].x!=CML_SIZE-1){
+//			// no y+1
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y])/6.0;
+//			}
+//			else if ( mi[i][j].x==0 and mi[i][j].y==0){
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y+1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1])/4.0;
+//			}
+//			else if ( mi[i][j].x==0 and mi[i][j].y==CML_SIZE-1){
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x+1][mi[i][j].y]+mM[mi[i][j].x+1][mi[i][j].y-1])/4.0;
+//			}
+//			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==0){
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y+1]+mM[mi[i][j].x-1][mi[i][j].y+1])/4.0;
+//			}
+//			else if ( mi[i][j].x==CML_SIZE-1 and mi[i][j].y==CML_SIZE-1){
+//				s[i][j]=(mM[mi[i][j].x][mi[i][j].y]+mM[mi[i][j].x-1][mi[i][j].y]+mM[mi[i][j].x][mi[i][j].y-1]+mM[mi[i][j].x-1][mi[i][j].y-1])/4.0;
+//			}
+//		}
+//	}
+//}
 
 
 
 
-void getsubmrc(float *p,int x,int y,mrcMat s,const struct _mrchead header)
+void getsubmrc(float *p,int x,int y,int CML_SIZE,float *s,const struct _mrchead header)
 {
 	printf("\ninside test p[0] %f\n",p[0]);
 	if (x<=header.nx-CML_SIZE-1 and y<=header.ny-CML_SIZE-1)
 	{
 		int i=0;
 		int j=0;
+        int k=0;
 		for (j=0;j<CML_SIZE;j++){
 			for (i=0;i<CML_SIZE;i++){
 				
-				s[j][i]=p[header.nx*(y+j)+x+i];
+                s[k]=p[header.nx*(y+j)+x+i];
+                k=k+1;
 				//printf("%dsp",header.nx*(y+j)+x+i);
 				//printf("\n");
 			}
@@ -172,41 +175,41 @@ void getsubmrc(float *p,int x,int y,mrcMat s,const struct _mrchead header)
 		printf("error");
 	}
 }
-void testp(float *p){
-	printf("\ntestp %f\n",p[0]);
-}
-void testsino(){
-	tmat m;
-	sinogram s;
-	mrcMat mM;
-	int i,j;
-	cml_help_max(m);
-	for (i=0;i<CML_SIZE;i++){
-		for (j=0;j<CML_SIZE;j++){
-			//if (i+j==CML_SIZE [>or i+j==CML_SIZE-1 or i+j==CML_SIZE+1<]){
-				//mM[i][j]=50;
-			//}
-			//else mM[i][j]=0;
-			mM[i][j]=200;
-		}
-	}
-	for (i=40;i<70;i++){
-		for (j=50;j<80;j++){
-			mM[i][j]=0;
-		}
-	}
-	for (i=0;i<CML_NUM;i++){
-		for (j=0;j<CML_SIZE;j++){
-			printf("(%d,%d)",m[i][j].x,m[i][j].y);
-		}
-		printf("\n");
-	}
-	createSinogram(s,m,mM);
-	Mat xm_origin=Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
-	MrcProcess::showimagecpp(xm_origin);
-	Mat xms=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
-	MrcProcess::showimagecpp(xms);
-}
+//void testp(float *p){
+//	printf("\ntestp %f\n",p[0]);
+//}
+//void testsino(){
+//	tmat m;
+//	sinogram s;
+//	mrcMat mM;
+//	int i,j;
+//	cml_help_max(m);
+//	for (i=0;i<CML_SIZE;i++){
+//		for (j=0;j<CML_SIZE;j++){
+//			//if (i+j==CML_SIZE [>or i+j==CML_SIZE-1 or i+j==CML_SIZE+1<]){
+//				//mM[i][j]=50;
+//			//}
+//			//else mM[i][j]=0;
+//			mM[i][j]=200;
+//		}
+//	}
+//	for (i=40;i<70;i++){
+//		for (j=50;j<80;j++){
+//			mM[i][j]=0;
+//		}
+//	}
+//	for (i=0;i<CML_NUM;i++){
+//		for (j=0;j<CML_SIZE;j++){
+//			printf("(%d,%d)",m[i][j].x,m[i][j].y);
+//		}
+//		printf("\n");
+//	}
+//	createSinogram(s,m,mM);
+//	Mat xm_origin=Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
+//	MrcProcess::showimagecpp(xm_origin);
+//	Mat xms=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
+//	MrcProcess::showimagecpp(xms);
+//}
 Mat imdft(Mat &I)
 {
 	
@@ -267,14 +270,18 @@ Mat imdft(Mat &I)
 
 int main()
 {
-	tmat m;	
-	sinogram s;
-	mrcMat mM; 
+//	tmat m;
+//	sinogram s;
+    int CML_SIZE=140;
+//    float mM[CML_SIZE][CML_SIZE];
 	int i,j;
+	int after_dft_size;
+	after_dft_size=getOptimalDFTSize(CML_SIZE);
 	//float k;
+
 	struct _mrchead header;
 	//initialize the assist matrix
-	cml_help_max(m);
+//	cml_help_max(m);
    /* for (i=0;i<CML_NUM;i++){*/
 		//for (j=0;j<CML_SIZE;j++){
 			////std::cout<<m[i][j]<<std::endl;	
@@ -302,7 +309,9 @@ int main()
 	//}
 //	float *pt=datap;
 //	/*normalize matrix before sinogram*/
-	getsubmrc(datap,332,120,mM,header);	
+    std::vector<std::vector<int> > vec(CML_SIZE,std::vector<int>(CML_SIZE));
+    float *mM = new float[CML_SIZE*CML_SIZE];
+    getsubmrc(datap,332,120,CML_SIZE,mM,header);
 	/*cv::Mat xm=cv::Mat(head_row,head_col,CV_32FC1,datap);*/
 	//cv::Mat xm2;
 	//xm2=MrcProcess::Gauss_Equal_Norm(xm);
@@ -331,37 +340,50 @@ int main()
 	/*}*/
 	Mat mMim=Mat(CML_SIZE,CML_SIZE,CV_32FC1,mM);
 	//float tma=mM[0][0];
-	Mat after_dft;
-	after_dft=imdft(mMim);
-	//float *a;
-	//*a=after_dft.data;
-	MrcProcess::showimagecpp(after_dft);
-	//float tmb=mM[0][0];
-	//if (tma!=tmb){
-		//printf("not equal");
-	//}
-	//fftw_plan p;
-	//p = fftw_plan_dft_2d(CML_SIZE,CML_SIZE,mM,mM);
-	//fftw_execute(p);
-	createSinogram(s,m,mM);
-	printf("\nsinogram\n");
-	//for (i=0;i<CML_NUM;i++)
-	//{
-		//for (j=0;j<CML_SIZE;j++)
-		//{
-			//printf("%f,",s[i][j]);
-		//}
-		//printf("\n");
-	//}
-	Mat sino=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
+//	Mat after_dft;
+
+    //cafter_dft = cvCreateImage(cvSize (after_dft_size,after_dft_size),IPL_DEPTH_32F,1);
+//    lin_polar_img = cvCreateImage(cvSize (after_dft_size,after_dft_size),IPL_DEPTH_32F,1);
+    Mat after_dft_zero=imdft(mMim);
+    Mat_<float> after_dft=after_dft_zero;
+//    float aft_dft[after_dft_size][after_dft_size];
+    Mat_<float>::iterator it = after_dft.begin();
+    Mat_<float>::iterator itend = after_dft.end();
+//    while (it!=itend){
+//        for (i=0;i<after_dft_size;i++){
+//            for (j=0;j<after_dft_size;j++){
+//                aft_dft[i][j]=*it;
+//                ++it;
+//            }
+//        }
+//    }
+    float aft_dft[after_dft_size*after_dft_size];
+    while (it!=itend){
+        for(i=0;i<after_dft_size*after_dft_size;i++){
+            aft_dft[i]=*it;
+            ++it;
+        }
+
+    }
+    Mat kkk=imdft(mMim);
+//    Mat kkk=imread("/home/qjq/OCYiE.jpg",0);
+    MrcProcess::showimagecpp(kkk);
+    Mat dst(kkk.size(),kkk.type());
+    IplImage ipl_afdft=kkk;
+    IplImage ipl_dst=dst;
+    cvLinearPolar( &ipl_afdft, &ipl_dst, cvPoint2D32f(kkk.cols/2,kkk.rows/2),72, CV_INTER_CUBIC);
+    MrcProcess::showimagecpp(dst);
+//	createSinogram(s,m,mM);
+//	printf("\nsinogram\n");
+//	Mat sino=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
 	//cv::Mat sino2;
 	//sino=MrcProcess::Gauss_Equal_Norm(sino);
 	//cv::Mat sino2=MrcProcess::mynorm(sino);
-	MrcProcess::showimagecpp(sino);
-	Mat sino2;
-	sino2=MrcProcess::mynorm(sino);
+    //MrcProcess::showimagecpp(sino);
+//	Mat sino2;
+//	sino2=MrcProcess::mynorm(sino);
 	//sino.convertTo(sino,CV_8UC1,1,0);//start here 11.5
-	MrcProcess::showimagecpp(sino2);
+//	MrcProcess::showimagecpp(sino2);
 	//printf("\nafter norm sinogram\n");
 	//for (i=0;i<CML_NUM;i++)
 	//{
