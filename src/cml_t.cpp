@@ -8,6 +8,8 @@
 //#include <fftw3.h>
 #include "fftw3.h"
 #include "opencv2/imgproc/imgproc_c.h"
+#include <array>
+#include <vector>
 //#include "dft.cpp"
 //#define CML_INTE 2
 //#define CML_NUM 90
@@ -170,6 +172,7 @@ void getsubmrc(float *p,int x,int y,int CML_SIZE,float *s,const struct _mrchead 
 			}
 		}
 	}
+    //corner and side
 	else
 	{
 		printf("error");
@@ -238,19 +241,19 @@ Mat imdft(Mat &I)
 		int cx = magI.cols/2;
 		int cy = magI.rows/2;
 
-		Mat q0(magI,Rect(0,0,cx,cy));
-		Mat q1(magI,Rect(cx,0,cx,cy));
-		Mat q2(magI,Rect(0,cy,cx,cy));
-		Mat q3(magI,Rect(cx,cy,cx,cy));
+        Mat q0(magI,Rect(0,0,cx,cy));
+        Mat q1(magI,Rect(cx,0,cx,cy));
+        Mat q2(magI,Rect(0,cy,cx,cy));
+        Mat q3(magI,Rect(cx,cy,cx,cy));
 
-		Mat tmp;
-		q0.copyTo(tmp);
-		q3.copyTo(q0);
-		tmp.copyTo(q3);
+        Mat tmp;
+        q0.copyTo(tmp);
+        q3.copyTo(q0);
+        tmp.copyTo(q3);
 
-		q1.copyTo(tmp);
-		q2.copyTo(q1);
-		tmp.copyTo(q2);
+        q1.copyTo(tmp);
+        q2.copyTo(q1);
+        tmp.copyTo(q2);
 
 		normalize(magI,magI,0,1,CV_MINMAX);
 		
@@ -266,7 +269,123 @@ Mat imdft(Mat &I)
 		return magI;
 }
 
+//float NCC(float *a,float *b,int CML_SIZE){
+//    float ncc;
+//    float sigma_a,sigma_b;
+//    Mat t;
 
+//}
+float NCC0(float *cml1,float *cml2,int CML_SIZE){
+    //cml1,cml2,length=CML_SIZE,one-dem array
+    //mpi
+    float ncc;
+    float sigma1;
+    float sigma2;
+    float mean1;
+    float mean2;
+    float sum1 = 0.0;
+    float sum2 = 0.0;
+    int i,j,k;
+    for (i=0;i<CML_SIZE;i++){
+        sum1 = sum1 + cml1[i] ;
+        sum2 = sum2 + cml2[i] ;
+    }
+//    mean1 = sum1 / CML_SIZE;
+//    mean2 = sum2 / CML_SIZE;
+    Mat a,b;
+    a = Mat(1,CML_SIZE,CV_32FC1,cml1);
+    b = Mat(1,CML_SIZE,CV_32FC1,cml2);
+    Mat tmp_m1,tmp_m2,tmp_sig1,tmp_sig2;
+    meanStdDev(a,tmp_m1,tmp_sig1);
+    meanStdDev(b,tmp_m2,tmp_sig2);
+    mean1 = tmp_m1.at<double>(0,0);
+    mean2 = tmp_m2.at<double>(0,0);
+    sigma1 = tmp_sig1.at<double>(0,0);
+    sigma2 = tmp_sig2.at<double>(0,0);
+    float coeff;
+    coeff = 1/(float(CML_SIZE)*sigma1*sigma2);
+//    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
+    float ncc_fft;//ncc_0
+    float ncc_2;
+    float ncc_3;
+    float ncc_4;
+    ncc_2 = CML_SIZE*mean1*mean2;
+    ncc_3 = mean1*sum2;
+    ncc_4 = mean2*sum1;
+    ncc_fft=0.0;
+    for(i=0;i<CML_SIZE;i++){
+        ncc_fft=ncc_fft + cml1[i]*cml2[i];
+    }
+    ncc=coeff*(ncc_fft+ncc_2-ncc_3-ncc_4);
+    //printf("\n in NCC0\n");
+    printf("\t%f\t",ncc);
+    return ncc;
+}
+
+
+float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
+    double a,b,c;
+//    double two_pi=6.28318530;
+    float cos_angleij,angleij;
+    a = cos((cmlkj-cmlki)*M_2_PI/float(after_dft_size));
+    b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
+    c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    cos_angleij = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
+    angleij = acos(cos_angleij);
+    return angleij;
+}
+
+bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
+    double a,b,c;
+//    double two_pi=6.28318530;
+    float cos_angleij,angleij;
+    a = cos((cmlkj-cmlki)*M_2_PI/float(after_dft_size));
+    b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
+    c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    if ((1+2*a*b*c)>a*a+b*b+c*c) {
+        return TRUE;
+    }
+        else return FALSE;
+}
+
+tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
+//  Ci,Cj,two-dem matrix
+//  change to one-d array
+    tuple ret;
+    int i,j,k;
+    float value_ini=-10.0;
+    float value[after_dft_size][after_dft_size];
+    float *p1;
+    float *p2;
+    //mpi here
+    for(i=0;i<after_dft_size;i++){
+        for(j=0;j<after_dft_size;j++){
+//            p1 = Ci[i*after_dft_size];
+//            p2 = Cj[j*after_dft_size];
+            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+        }
+    }
+    for(i=0;i<after_dft_size;i++){
+        for(j=0;j<after_dft_size;j++){
+            printf("\t%f\t",value[i][j]);
+            if (value[i][j]>value_ini) {
+                value_ini = value[i][j];
+                ret.x=i;
+                ret.y=j;
+            }
+//            else break;
+        }
+    }
+    return ret;
+}
+
+void voting_algo(int *hist,float *p,int projection_i,int projection_j,int VA_length){
+    int projection_k;
+    int i;
+    for (i=0;i<VA_length;i++){
+        ;//here
+    }
+}
 
 int main()
 {
@@ -345,10 +464,10 @@ int main()
     //cafter_dft = cvCreateImage(cvSize (after_dft_size,after_dft_size),IPL_DEPTH_32F,1);
 //    lin_polar_img = cvCreateImage(cvSize (after_dft_size,after_dft_size),IPL_DEPTH_32F,1);
     Mat after_dft_zero=imdft(mMim);
-    Mat_<float> after_dft=after_dft_zero;
+//    Mat_<float> after_dft=after_dft_zero;
 //    float aft_dft[after_dft_size][after_dft_size];
-    Mat_<float>::iterator it = after_dft.begin();
-    Mat_<float>::iterator itend = after_dft.end();
+//    Mat_<float>::iterator it = after_dft.begin();
+//    Mat_<float>::iterator itend = after_dft.end();
 //    while (it!=itend){
 //        for (i=0;i<after_dft_size;i++){
 //            for (j=0;j<after_dft_size;j++){
@@ -357,22 +476,66 @@ int main()
 //            }
 //        }
 //    }
-    float aft_dft[after_dft_size*after_dft_size];
-    while (it!=itend){
-        for(i=0;i<after_dft_size*after_dft_size;i++){
-            aft_dft[i]=*it;
-            ++it;
-        }
+    float aft_dft[after_dft_size][after_dft_size];
+//    while (it!=itend){
+//        for(i=0;i<after_dft_size*after_dft_size;i++){
+//            aft_dft[i]=*it;
+//            ++it;
+//        }
 
-    }
+//    }
     Mat kkk=imdft(mMim);
 //    Mat kkk=imread("/home/qjq/OCYiE.jpg",0);
+//    Mat dkkk=imdft(kkk);
+//    MrcProcess::showimagecpp(dkkk);
     MrcProcess::showimagecpp(kkk);
     Mat dst(kkk.size(),kkk.type());
     IplImage ipl_afdft=kkk;
     IplImage ipl_dst=dst;
-    cvLinearPolar( &ipl_afdft, &ipl_dst, cvPoint2D32f(kkk.cols/2,kkk.rows/2),72, CV_INTER_CUBIC);
+    cvLinearPolar( &ipl_afdft, &ipl_dst, cvPoint2D32f(kkk.cols/2,kkk.rows/2),kkk.cols/2,CV_INTER_CUBIC);
     MrcProcess::showimagecpp(dst);
+    printf("\ndst.height %d %d",dst.cols,dst.rows);
+    //linearPolar to two array;
+    Mat_<float> dstf=dst;
+    Mat_<float>::iterator it = dstf.begin();
+    Mat_<float>::iterator itend = dstf.end();
+        while (it!=itend){
+            for (i=0;i<after_dft_size;i++){
+                for (j=0;j<after_dft_size;j++){
+                    aft_dft[i][j]=*it;
+                    ++it;
+                }
+            }
+        }
+    float *a = new float[after_dft_size];
+    float *b = new float[after_dft_size];
+    for(i=0;i<after_dft_size;i++){
+        a[i]=aft_dft[0][i];
+    }
+    for(i=0;i<after_dft_size;i++){
+        b[i]=aft_dft[1][i];
+    }
+    float ncc_t;
+    //11.21
+    ncc_t=NCC0(aft_dft[2],aft_dft[74],after_dft_size);
+//    float ncc_value[after_dft_size][after_dft_size];
+//    for (i=0;i<after_dft_size;i++){
+//        for (j=0;j<after_dft_size;j++){
+//            ncc_value[i][j]=NCC0(aft_dft[i],aft_dft[j],after_dft_size);
+//        }
+//    }
+    printf("\nncc_t %f\n",ncc_t);
+    tuple t;
+    float *all_aft = new float[after_dft_size*after_dft_size];
+    int k=0;
+    for(i=0;i<after_dft_size;i++){
+        for(j=0;j<after_dft_size;j++){
+            all_aft[k]=aft_dft[i][j];
+            k++;
+        }
+    }
+    t = NCC_value(all_aft,all_aft,after_dft_size);
+    printf("\nNCC_value t %d\t%d\t\n",t.x,t.y);
 //	createSinogram(s,m,mM);
 //	printf("\nsinogram\n");
 //	Mat sino=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
@@ -396,6 +559,9 @@ int main()
 	//tuple (*pm)[60][CML_SIZE];
 	//pm=&m;
 	delete[] datap;
+    delete[] a;
+    delete[] b;
+    delete[] all_aft;
 	//testsino();
 	return 0;
 }
