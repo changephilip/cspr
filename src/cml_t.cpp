@@ -241,19 +241,19 @@ Mat imdft(Mat &I)
 		int cx = magI.cols/2;
 		int cy = magI.rows/2;
 
-        Mat q0(magI,Rect(0,0,cx,cy));
-        Mat q1(magI,Rect(cx,0,cx,cy));
-        Mat q2(magI,Rect(0,cy,cx,cy));
-        Mat q3(magI,Rect(cx,cy,cx,cy));
+//        Mat q0(magI,Rect(0,0,cx,cy));
+//        Mat q1(magI,Rect(cx,0,cx,cy));
+//        Mat q2(magI,Rect(0,cy,cx,cy));
+//        Mat q3(magI,Rect(cx,cy,cx,cy));
 
-        Mat tmp;
-        q0.copyTo(tmp);
-        q3.copyTo(q0);
-        tmp.copyTo(q3);
+//        Mat tmp;
+//        q0.copyTo(tmp);
+//        q3.copyTo(q0);
+//        tmp.copyTo(q3);
 
-        q1.copyTo(tmp);
-        q2.copyTo(q1);
-        tmp.copyTo(q2);
+//        q1.copyTo(tmp);
+//        q2.copyTo(q1);
+//        tmp.copyTo(q2);
 
 		normalize(magI,magI,0,1,CV_MINMAX);
 		
@@ -318,7 +318,7 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
     }
     ncc=coeff*(ncc_fft+ncc_2-ncc_3-ncc_4);
     //printf("\n in NCC0\n");
-    printf("\t%f\t",ncc);
+//    printf("\t%f\t",ncc);
     return ncc;
 }
 
@@ -331,6 +331,7 @@ float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int 
     b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
     c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
     cos_angleij = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
+    printf("\ncos_angle %f\n",cos_angleij);
     angleij = acos(cos_angleij);
     return angleij;
 }
@@ -338,7 +339,7 @@ float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int 
 bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
 //    double two_pi=6.28318530;
-    float cos_angleij,angleij;
+//    float cos_angleij,angleij;
     a = cos((cmlkj-cmlki)*M_2_PI/float(after_dft_size));
     b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
     c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
@@ -367,7 +368,7 @@ tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
     }
     for(i=0;i<after_dft_size;i++){
         for(j=0;j<after_dft_size;j++){
-            printf("\t%f\t",value[i][j]);
+//            printf("\t%f\t",value[i][j]);
             if (value[i][j]>value_ini) {
                 value_ini = value[i][j];
                 ret.x=i;
@@ -376,15 +377,42 @@ tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //            else break;
         }
     }
+    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
     return ret;
 }
 
-void voting_algo(int *hist,float *p,int projection_i,int projection_j,int VA_length){
+void voting_algo(int *hist,float *p,int projection_i,int projection_j,int VA_length)
+ {
     int projection_k;
     int i;
     for (i=0;i<VA_length;i++){
         ;//here
     }
+}
+
+void linearpolar(cv::Mat &I,cv::Mat &dst){
+    //may release problem here
+//    Mat dst(I.size(),I.type());
+    IplImage ipl_afdft=I;
+    IplImage ipl_dst=dst;
+    cvLinearPolar( &ipl_afdft, &ipl_dst, cvPoint2D32f(I.cols/2,I.rows/2),I.cols/2,CV_INTER_CUBIC);
+//    return dst;
+}
+void image_to_mat(cv::Mat &I,float *matp,int after_dft_size){
+    int i,j,k;
+    k=0;
+    Mat_<float> dstf=I;
+    Mat_<float>::iterator it = dstf.begin();
+    Mat_<float>::iterator itend = dstf.end();
+        while (it!=itend){
+            for (i=0;i<after_dft_size;i++){
+                for (j=0;j<after_dft_size;j++){
+                    matp[k]=*it;
+                    ++it;
+                    k++;
+                }
+            }
+        }
 }
 
 int main()
@@ -428,7 +456,7 @@ int main()
 	//}
 //	float *pt=datap;
 //	/*normalize matrix before sinogram*/
-    std::vector<std::vector<int> > vec(CML_SIZE,std::vector<int>(CML_SIZE));
+//    std::vector<std::vector<int> > vec(CML_SIZE,std::vector<int>(CML_SIZE));
     float *mM = new float[CML_SIZE*CML_SIZE];
     getsubmrc(datap,332,120,CML_SIZE,mM,header);
 	/*cv::Mat xm=cv::Mat(head_row,head_col,CV_32FC1,datap);*/
@@ -453,7 +481,7 @@ int main()
 	/*printf("datap the first %f\n",datap[0]);*/
 	//printf("\ndatap %f\n",datap[0]);
    /* testp(datap);*/
-	//printf("datap\n");
+    //("datap\n");
 	//for (i=0;i<CML_SIZE;i++){
 		//printf("%f,",datap[i]);
 	/*}*/
@@ -488,21 +516,22 @@ int main()
 //    Mat kkk=imread("/home/qjq/OCYiE.jpg",0);
 //    Mat dkkk=imdft(kkk);
 //    MrcProcess::showimagecpp(dkkk);
-    MrcProcess::showimagecpp(kkk);
+//    MrcProcess::showimagecpp(kkk);
     Mat dst(kkk.size(),kkk.type());
     IplImage ipl_afdft=kkk;
     IplImage ipl_dst=dst;
     cvLinearPolar( &ipl_afdft, &ipl_dst, cvPoint2D32f(kkk.cols/2,kkk.rows/2),kkk.cols/2,CV_INTER_CUBIC);
-    MrcProcess::showimagecpp(dst);
-    printf("\ndst.height %d %d",dst.cols,dst.rows);
+//    MrcProcess::showimagecpp(dst);
+//    printf("\ndst.height %d %d",dst.cols,dst.rows);
     //linearPolar to two array;
+
     Mat_<float> dstf=dst;
     Mat_<float>::iterator it = dstf.begin();
     Mat_<float>::iterator itend = dstf.end();
         while (it!=itend){
             for (i=0;i<after_dft_size;i++){
                 for (j=0;j<after_dft_size;j++){
-                    aft_dft[i][j]=*it;
+                    aft_dft[i][j]=*it;                    
                     ++it;
                 }
             }
@@ -517,14 +546,14 @@ int main()
     }
     float ncc_t;
     //11.21
-    ncc_t=NCC0(aft_dft[2],aft_dft[74],after_dft_size);
+    ncc_t=NCC0(aft_dft[0],aft_dft[3],after_dft_size);
 //    float ncc_value[after_dft_size][after_dft_size];
 //    for (i=0;i<after_dft_size;i++){
 //        for (j=0;j<after_dft_size;j++){
 //            ncc_value[i][j]=NCC0(aft_dft[i],aft_dft[j],after_dft_size);
 //        }
 //    }
-    printf("\nncc_t %f\n",ncc_t);
+//    printf("\nncc_t %f\n",ncc_t);
     tuple t;
     float *all_aft = new float[after_dft_size*after_dft_size];
     int k=0;
@@ -534,8 +563,10 @@ int main()
             k++;
         }
     }
+
     t = NCC_value(all_aft,all_aft,after_dft_size);
-    printf("\nNCC_value t %d\t%d\t\n",t.x,t.y);
+//    printf("\nNCC_value t %d\t%d\t\n",t.x,t.y);
+    int *cml_matrix = new int[after_dft_size*after_dft_size];
 //	createSinogram(s,m,mM);
 //	printf("\nsinogram\n");
 //	Mat sino=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
@@ -558,10 +589,90 @@ int main()
 	//}
 	//tuple (*pm)[60][CML_SIZE];
 	//pm=&m;
+//    std::vector<float*> sss;
+//    sss.push_back(all_aft);
+//    float* ssss[3];
+//    *ssss[0]=all_aft;
+//    t = NCC_value(ssss[0],ssss[0],after_dft_size);
+//    int N;
+//    float *all_data = new float[N*CML_SIZE*CML_SIZE];
+//    float *all_data_dft = new float[N*after_dft_size*after_dft_size];
+
 	delete[] datap;
     delete[] a;
     delete[] b;
     delete[] all_aft;
+    delete[] mM;
+    delete[] cml_matrix;
+//    delete[] all_data;
+//    delete[] all_data_dft;
 	//testsino();
+    //test 3 mrc,a,b,c;
+    struct _mrchead mrca,mrcb,mrcc;
+    FILE *fmrca,*fmrcb,*fmrcc;
+    fmrca=fopen("/home/qjq/md_em/3d_0.000000_0.000000_0.000000.mrc","rb");
+    fmrcb=fopen("/home/qjq/md_em/3d_0.000000_-45.000000_-45.000000.mrc","rb");
+    fmrcc=fopen("/home/qjq/md_em/3d_-45.000000_-45.000000_0.000000.mrc","rb");
+    mrca=MrcProcess::readhead(fmrca);
+    mrcb=MrcProcess::readhead(fmrcb);
+    mrcc=MrcProcess::readhead(fmrcc);
+    float *data_a=new float[mrca.nx*mrca.ny];
+    float *data_b=new float[mrcb.nx*mrcb.ny];
+    float *data_c=new float[mrcc.nx*mrcc.ny];
+    MrcProcess::readmrcdata(fmrca,data_a,mrca);
+    MrcProcess::readmrcdata(fmrcb,data_b,mrcb);
+    MrcProcess::readmrcdata(fmrcc,data_c,mrcc);
+    int dft_size=getOptimalDFTSize(mrca.nx);
+    Mat image_a=Mat(mrca.nx,mrca.nx,CV_32FC1,data_a);
+    Mat image_b=Mat(mrca.nx,mrca.nx,CV_32FC1,data_b);
+    Mat image_c=Mat(mrca.nx,mrca.nx,CV_32FC1,data_c);
+    Mat afdft_a=imdft(image_a);
+    Mat afdft_b=imdft(image_b);
+    Mat afdft_c=imdft(image_c);
+    MrcProcess::showimagecpp(afdft_a);
+    MrcProcess::showimagecpp(afdft_b);
+    MrcProcess::showimagecpp(afdft_c);
+    Mat ldft_a(afdft_a.size(),afdft_a.type());
+    Mat ldft_b(afdft_b.size(),afdft_b.type());
+    Mat ldft_c(afdft_c.size(),afdft_c.type());
+    linearpolar(afdft_a,ldft_a);
+    linearpolar(afdft_b,ldft_b);
+    linearpolar(afdft_c,ldft_c);
+    MrcProcess::showimagecpp(ldft_a);
+    MrcProcess::showimagecpp(ldft_b);
+    MrcProcess::showimagecpp(ldft_c);
+    float *mata = new float[dft_size*dft_size];
+    float *matb = new float[dft_size*dft_size];
+    float *matc = new float[dft_size*dft_size];
+    image_to_mat(ldft_a,mata,dft_size);
+    image_to_mat(ldft_b,matb,dft_size);
+    image_to_mat(ldft_c,matc,dft_size);
+    int cab,cba,cac,cca,cbc,ccb;
+    tuple ab,ac,bc;
+    ab=NCC_value(mata,matb,dft_size);
+    bc=NCC_value(matb,matc,dft_size);
+    ac=NCC_value(mata,matc,dft_size);
+    cab=ab.x;
+    cba=ab.y;
+    cbc=bc.x;
+    ccb=bc.y;
+    cac=ac.x;
+    cca=ac.y;
+    float angle_ab=cal_angle(cab,cac,cba,cbc,cca,ccb,dft_size);
+    float angle_ac=cal_angle(cac,cab,cca,ccb,cba,cbc,dft_size);
+    float angle_bc=cal_angle(cbc,cba,ccb,cca,cab,cac,dft_size);
+//    printf("\nncc_value ab\t%f\n",ab);
+    printf("\nangle_ab \t%f\n",angle_ab);
+//    printf("\nncc_value ab\t%f\n",ac);
+    printf("\nangle_ac \t%f\n",angle_ac);
+//    printf("\nncc_value ab\t%f\n",bc);
+    printf("\nangle_bc \t%f\n",angle_bc);
+    delete[] data_a;
+    delete[] data_b;
+    delete[] data_c;
+    delete[] mata;
+    delete[] matb;
+    delete[] matc;
+
 	return 0;
 }
