@@ -178,7 +178,7 @@ void getsubmrc(float *p,int x,int y,int CML_SIZE,float *s,const struct _mrchead 
 		printf("error");
 	}
 }
-//void testp(float *p){
+/*void testp(float *p){
 //	printf("\ntestp %f\n",p[0]);
 //}
 //void testsino(){
@@ -213,6 +213,7 @@ void getsubmrc(float *p,int x,int y,int CML_SIZE,float *s,const struct _mrchead 
 //	Mat xms=Mat(CML_NUM,CML_SIZE,CV_32FC1,s);
 //	MrcProcess::showimagecpp(xms);
 //}
+*/
 Mat imdft(Mat &I)
 {
 	
@@ -241,19 +242,19 @@ Mat imdft(Mat &I)
 		int cx = magI.cols/2;
 		int cy = magI.rows/2;
 
-//        Mat q0(magI,Rect(0,0,cx,cy));
-//        Mat q1(magI,Rect(cx,0,cx,cy));
-//        Mat q2(magI,Rect(0,cy,cx,cy));
-//        Mat q3(magI,Rect(cx,cy,cx,cy));
+        Mat q0(magI,Rect(0,0,cx,cy));
+        Mat q1(magI,Rect(cx,0,cx,cy));
+        Mat q2(magI,Rect(0,cy,cx,cy));
+        Mat q3(magI,Rect(cx,cy,cx,cy));
 
-//        Mat tmp;
-//        q0.copyTo(tmp);
-//        q3.copyTo(q0);
-//        tmp.copyTo(q3);
+        Mat tmp;
+        q0.copyTo(tmp);
+        q3.copyTo(q0);
+        tmp.copyTo(q3);
 
-//        q1.copyTo(tmp);
-//        q2.copyTo(q1);
-//        tmp.copyTo(q2);
+        q1.copyTo(tmp);
+        q2.copyTo(q1);
+        tmp.copyTo(q2);
 
 		normalize(magI,magI,0,1,CV_MINMAX);
 		
@@ -612,7 +613,7 @@ int main()
     FILE *fmrca,*fmrcb,*fmrcc;
     fmrca=fopen("/home/qjq/md_em/3d_0.000000_0.000000_0.000000.mrc","rb");
     fmrcb=fopen("/home/qjq/md_em/3d_0.000000_-45.000000_-45.000000.mrc","rb");
-    fmrcc=fopen("/home/qjq/md_em/3d_-45.000000_-45.000000_0.000000.mrc","rb");
+    fmrcc=fopen("/home/qjq/md_em/3d_-90.000000_-45.000000_0.000000.mrc","rb");
     mrca=MrcProcess::readhead(fmrca);
     mrcb=MrcProcess::readhead(fmrcb);
     mrcc=MrcProcess::readhead(fmrcc);
@@ -626,6 +627,9 @@ int main()
     Mat image_a=Mat(mrca.nx,mrca.nx,CV_32FC1,data_a);
     Mat image_b=Mat(mrca.nx,mrca.nx,CV_32FC1,data_b);
     Mat image_c=Mat(mrca.nx,mrca.nx,CV_32FC1,data_c);
+    MrcProcess::showimagecpp(image_a);
+    MrcProcess::showimagecpp(image_b);
+    MrcProcess::showimagecpp(image_c);
     Mat afdft_a=imdft(image_a);
     Mat afdft_b=imdft(image_b);
     Mat afdft_c=imdft(image_c);

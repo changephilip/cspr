@@ -50,7 +50,7 @@ void readmrcdata(FILE  *f,float* dataperfile,struct _mrchead mrchead){
     for (int i=0;i<columns*rows;++i){
         //fseek(f,mrcsize+4*i,0);
         //size_t s=sizeof(struct _mrchead);
-        fread(&dataperfile[i],4,1,f);
+        fread(&dataperfile[i],4,1,f);//float 4;
         //printf("%d\t",i);
         //printf("%f\n",dataperfile[i]);
         }
