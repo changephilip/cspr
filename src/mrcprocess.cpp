@@ -65,7 +65,6 @@ cv::Mat mynorm(const cv::Mat &image)
     double minVal=0;
     cv::Point maxLoc;
     cv::minMaxLoc(image,&minVal,&maxVal);
-    //#####you need start at here
     //iterator to change the element of matrix
     cv::Mat_<uchar> image2=image;
     cv::Mat_<uchar>::iterator it = image2.begin();
@@ -104,8 +103,8 @@ cv::Mat mrcOrigin(FILE *f){
 //    f=fopen("/home/pcchange/swap/1.mrc","rb");
 //    std::fstream f("/home/pcchange/swap/1.mrc",std::ios_base::binary);
     header=MrcProcess::readhead(f);
-    head_col=header.nx;
-    head_row=header.ny;
+    head_col=header.nx;//col-nx;
+    head_row=header.ny;//row-ny
     /*printf("\n");
     printf("%d\n",header.nx);
     printf("%d\n",header.ny);

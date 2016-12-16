@@ -334,7 +334,7 @@ float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int 
     cos_angleij = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
     printf("\ncos_angle %f\n",cos_angleij);
     angleij = acos(cos_angleij);
-    return angleij;
+    return angleij*180.0/M_PI;
 }
 
 bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
