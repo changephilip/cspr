@@ -98,7 +98,7 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
     float mean2;
     float sum1 = 0.0;
     float sum2 = 0.0;
-    int i,j,k;
+    int i;
     for (i=0;i<CML_SIZE;i++){
         sum1 = sum1 + cml1[i] ;
         sum2 = sum2 + cml2[i] ;
@@ -141,6 +141,40 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
 //    printf("\t%f\t",ncc);
     return ncc;
 }
+
+
+float FNCC(float *cml1,float *cml2,int CML_SIZE){
+    //cml1,cml2,length=CML_SIZE,one-dem array
+    //mpi
+    float ncc;
+    float mean1;
+    float mean2;
+    float sum1 = 0.0;
+    float sum2 = 0.0;
+    int i;
+    for (i=0;i<CML_SIZE;i++){
+        sum1 = sum1 + cml1[i] ;
+        sum2 = sum2 + cml2[i] ;
+    }
+    int Ncc=0;
+    mean1 = sum1 / CML_SIZE;
+    mean2 = sum2 / CML_SIZE;
+    for (i=0;i<CML_SIZE;i++){
+        if (cml1[i]>=mean1) {
+            if (cml2[i]>=mean2){
+                Ncc+=1;
+            }
+            else Ncc+=-1;
+        }
+        else if (cml2[i]>=mean2){
+            Ncc+=-1;
+        }
+        else Ncc+=1;
+    }
+    ncc=(float)Ncc/CML_SIZE;
+    return ncc;
+}
+
 
 float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
@@ -188,7 +222,7 @@ cml_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
-            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            value[i][j] = FNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
 //            printf("\n000003");
         }
 

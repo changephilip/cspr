@@ -1,16 +1,17 @@
 #include "cml.h"
 #include <time.h>
+#include <fftw3.h>
 //need link mpi
 int main(int argc,char **argv)
 {
 	
-
     int N;
     N=atoi(argv[1]);
     printf("%d",N);
     int cml_size;
     int i,j,k;
     int t_start,t_read_file,t_ncc_value,t_end;
+
     t_start=time(NULL);
 //    N=50;
     cml_size=140;
@@ -32,6 +33,8 @@ int main(int argc,char **argv)
     CML::cml_dftread(lineardft_matrix,table,cml_size,dft_size,N);
     printf("\nmalloc success\n");
     t_read_file=time(NULL);
+
+
 //    #pragma omp parallel
     for (i=0;i<N;i++){
         for (j=0;j<N;j++){
@@ -49,8 +52,9 @@ int main(int argc,char **argv)
     t_ncc_value=time(NULL);
     float *voting = new float[N*(N-1)*(N-2)/2];
     int T,alpha_ij;
-    T=90;
+    T=60;
     float *hist = new float[N*(N-1)*T/2];
+//    *hist = {0};
     for (i=0;i<N;i++){
         for (j=i+1;j<N;j++){
 #pragma omp parallel for
@@ -60,6 +64,7 @@ int main(int argc,char **argv)
                     if (CML::voting_condition(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size)==TRUE) {
                         voting[alpha_ij]=CML::cal_angle(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
                     }
+                    else voting[alpha_ij]=-9.0;
                 }
                 else voting[alpha_ij]=-10.0;
             }
@@ -67,11 +72,14 @@ int main(int argc,char **argv)
         }
     }
     int hist_row=N*(N-1)/2;
+    for (i=0;i<hist_row*T;i++){
+        hist[i]=0.0;
+    }
     float sigma=180.0/T;
     for (i=0;i<hist_row;i++){
         for (j=0;j<N-2;j++){
             float tmp=voting[i*(N-2)+j];
-            if (voting[i*(N-2)+j]!=-10.0){
+            if (voting[i*(N-2)+j]!=-10.0 /*and voting[i*(N-2)+j]!=-9.0*/){
                 #pragma omp parallel for
 //                {
                 for(k=0;k<T;k++){
@@ -79,20 +87,28 @@ int main(int argc,char **argv)
                 }
 //                }
             }
+
         }
     }
-    int *hist_peak =  new int[N*(N-1)/2];
+    float *hist_peak =  new float[N*(N-1)/2];
     float *peak;
+    int *hist_index = new int[N*(N-1)/2];
 
     for (i=0;i<hist_row;i++){
         peak=&hist[i*T];
-        hist_peak[i]=CML::max_float_index(peak,T);
+        hist_peak[i]=CML::max_float(peak,T);
+        hist_index[i]=CML::max_float_index(peak,T);
         }
+//    free(peak);
     t_end=time(NULL);
+//    for (i=0;i<N;i++){
+
+//    }
+    printf("alpha_ij\ti\tj\tindex\tpeak\n");
     for (i=0;i<N;i++){
         for(j=i+1;j<N;j++){
             int index=(2*N-1-i)*i/2+j-(i+1);
-            printf("alpha_ij\t%d\t%d\t%d\n",i,j,hist_peak[index]);
+            printf("alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[i],hist_peak[index]);
         }
     }
 //    delete[] cml_matrix;
@@ -105,4 +121,6 @@ int main(int argc,char **argv)
     delete[] voting;
     delete[] hist;
     delete[] hist_peak;
+    delete[] hist_index;
+
 }
