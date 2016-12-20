@@ -200,7 +200,8 @@ bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlk
     if ((1+2*a*b*c)>a*a+b*b+c*c) {
         return TRUE;
     }
-        else return FALSE;
+        else
+    {return FALSE;}
 }
 
 
@@ -340,7 +341,7 @@ float max_float(float *infloat,int size_of_array){
     max_return=infloat[0];
     for (i=1;i<size_of_array;i++){
         if (max_return < infloat[i]){
-            max_return= infloat[i];
+            max_return=infloat[i];
         }
     }
     return max_return;

@@ -42,5 +42,8 @@ target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 add_executable(cml_va cml_va.cpp)
 target_link_libraries(cml_va libcml)
 
+add_executable(cml_dcv cml_dcv.cpp)
+target_link_libraries(cml_dcv libcml)
+
 add_executable(test_mpi test_mpi.cpp)
 #target_link_libraries(test_mpi ${OpenMP_LIBS})
