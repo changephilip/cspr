@@ -1,6 +1,5 @@
 #include "cml.h"
 #include <time.h>
-#include <fftw3.h>
 #include <sstream>
 //need link mpi
 int main(int argc,char **argv)
@@ -49,7 +48,7 @@ int main(int argc,char **argv)
 
 //hist_peak矩阵的初始化，记录每一个alphaij的最大可能值
     float *hist_peak=new float[hist_row];
-
+    int *hist_index = new int[hist_row];
 
     std::ifstream mainMrcStarFile("/home/qjq/particles4class2d.star");
     int dft_size_pow=dft_size*dft_size;
@@ -122,7 +121,7 @@ int main(int argc,char **argv)
         }
 
     //    float *peak;
-        int *hist_index = new int[hist_row];
+
         #pragma omp parallel for
         for (i=0;i<hist_row;i++){
     //        peak=&hist[i*T];
@@ -143,9 +142,17 @@ int main(int argc,char **argv)
         }
         printf("alpha_ij\t0\n");
         for(i=0;i<N;i++){
-            printf("%d,",cml_pair_matrix[0][i]);
+            printf("%d,",cml_pair_matrix[1][i]);
         }
-        printf("hist_peak[1]\n");
+        printf("voting[0]\n");
+        for (i=0;i<N;i++){
+            printf("%f,",voting[0][i]);
+        }
+        printf("voting[1]\n");
+        for (i=0;i<N;i++){
+            printf("%f,",voting[1][i]);
+        }
+        printf("\nhist_peak[1]\n");
         for(i=0;i<T;i++){
             printf("%f\t",hist[0][i]);
         }

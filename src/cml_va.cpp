@@ -1,6 +1,5 @@
 #include "cml.h"
 #include <time.h>
-#include <fftw3.h>
 #include <sstream>
 //need link mpi
 int main(int argc,char **argv)
@@ -80,22 +79,23 @@ int main(int argc,char **argv)
 
     for (i=0;i<N;i++){
         for (j=i+1;j<N;j++){
+            alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N;
 #pragma omp parallel for
             for (k=0;k<N;k++){
-                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;
+                    int index=alpha_ij+k;
+//                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
                 if (k!=i and k!=j){
                     if (CML::voting_condition(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size)==TRUE) {
-                        voting[alpha_ij]=CML::cal_angle(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
+                        voting[index]=CML::cal_angle(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
                     }
                     else {
-                        voting[alpha_ij]=-9.0;
+                        voting[index]=-9.0;
                     }
                 }
                 else {
-                    voting[alpha_ij]=-10.0;
+                    voting[index]=-10.0;
                 }
             }
-
         }
     }
 
@@ -136,7 +136,15 @@ int main(int argc,char **argv)
     }
     printf("alpha_ij\t0\n");
     for(i=0;i<N;i++){
-        printf("%d,",cml_pair_matrix[0][i]);
+        printf("%d,",cml_pair_matrix[1][i]);
+    }
+    printf("voting[0]\n");
+    for (i=0;i<N;i++){
+        printf("%f,",voting[i]);
+    }
+    printf("voting[1]\n");
+    for (i=0;i<N;i++){
+        printf("%f,",voting[i+N]);
     }
     printf("\nhist_peak[1]\n");
     for(i=0;i<T;i++){
