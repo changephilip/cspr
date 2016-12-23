@@ -19,10 +19,13 @@ int main(int argc,char **argv)
     t_start=time(NULL);
 
     cml_size=140;
+    int dft_size=cv::getOptimalDFTSize(cml_size);
+    int dft_size_pow=dft_size*dft_size;
+
 
     int hist_row=N*(N-1)/2;
 
-    int dft_size=cv::getOptimalDFTSize(cml_size);
+
 //初始化cml矩阵
     int *cml_pair_matrix[N];
     for (i=0;i<N;i++){
@@ -51,15 +54,40 @@ int main(int argc,char **argv)
     int *hist_index = new int[hist_row];
 
     std::ifstream mainMrcStarFile("/home/qjq/particles4class2d.star");
-    int dft_size_pow=dft_size*dft_size;
+
     fileNameToCoodinateList table=CML::CNNpicker(mainMrcStarFile);
     int numItem = CML::calMnistItem(table);
+    FILE *f;
+    f=fopen("qjq_data","wb");
     printf("\nnumItem\t%d\n",numItem);
-    long malloc_size_dft=N*dft_size*dft_size;
+    long malloc_size_dft=numItem*dft_size*dft_size;
     printf("\nlineardft_matrix_length\t%ld\n",malloc_size_dft);
     float *lineardft_matrix=new float[malloc_size_dft];
+    float *disk_dft_matrix=new float[malloc_size_dft];
     CML::cml_dftread(lineardft_matrix,table,cml_size,dft_size,N);
+
     printf("\nmalloc success\n");
+    char sbuf[1960000];
+    setvbuf(f,sbuf,_IOFBF,1960000);
+    fwrite(lineardft_matrix,sizeof(float),malloc_size_dft,f);
+    fseek(f,0,SEEK_END);
+    long filelength;
+    filelength=ftell(f);
+    printf("qjq_data length %ld\n",filelength);
+    fclose(f);
+    f=fopen("qjq_data","rb");
+    fseek(f,0,SEEK_SET);
+    fread(disk_dft_matrix,sizeof(float),malloc_size_dft,f);
+    for (i=0;i<malloc_size_dft;i++){
+        if (lineardft_matrix[i]!=disk_dft_matrix[i]){
+            printf("line %f \t disk %f\n",lineardft_matrix[i],disk_dft_matrix[i]);
+            printf("i %d error not equal\n",i);
+            exit(EXIT_FAILURE);
+        }
+    }
+//    printf("lineardft_matrix \t%f\n",lineardft_matrix[0]);
+//    printf("disk_matrix \t%f\n",disk_dft_matrix[0]);
+    fclose(f);
 
     t_read_file=time(NULL);
 
@@ -168,6 +196,7 @@ int main(int argc,char **argv)
 
 
         delete[] lineardft_matrix;
+        delete[] disk_dft_matrix;
         delete[] hist_peak;
         delete[] hist_index;
         #pragma omp parallel for

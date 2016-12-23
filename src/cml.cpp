@@ -151,6 +151,7 @@ float FNCC(float *cml1,float *cml2,int CML_SIZE){
     float mean2;
     float sum1 = 0.0;
     float sum2 = 0.0;
+
     int i;
     for (i=0;i<CML_SIZE;i++){
         sum1 = sum1 + cml1[i] ;
@@ -243,6 +244,47 @@ cml_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
     return ret;
 }
 
+cml_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size){
+//  Ci,Cj,two-dem matrix
+//  change to one-d array
+    cml_tuple ret;
+    int i,j;
+    float value_ini=-10.0;
+    float value[after_dft_size][after_dft_size];
+//    float *p1;
+//    float *p2;
+    //mpi here
+    printf("\n");
+    for(i=0;i<after_dft_size;i++){
+//        printf("\n000001");
+#pragma omp parallel for
+
+        for(j=0;j<after_dft_size;j++){
+//            p1 = Ci[i*after_dft_size];
+//            p2 = Cj[j*after_dft_size];
+//            printf("\n0000002");
+            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            float fncc_v= FNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            printf(",%f",(fabs((value[i][j]-fncc_v)/fncc_v)));
+//            printf("\n000003");
+        }
+        printf("\n");
+
+    }
+    for(i=0;i<after_dft_size;i++){
+        for(j=0;j<after_dft_size;j++){
+//            printf("\t%f\t",value[i][j]);
+            if (value[i][j]>value_ini) {
+                value_ini = value[i][j];
+                ret.x=i;
+                ret.y=j;
+            }
+//            else break;
+        }
+    }
+//    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
+    return ret;
+}
 
 void linearpolar(cv::Mat &I,cv::Mat &dst){
     //may release problem here
@@ -311,6 +353,7 @@ void cml_dftread(float *data,fileNameToCoodinateList intable,int cml_size,int df
 //        mrc = MrcProcess::mrcOrigin(tmpf);//it has Gauss_Equal_Norm;
         MrcProcess::readmrcdata(tmpf,mrc,hf);
 //        printf("\n00006\n");
+
         for (auto m:(map_it -> second)){
             if (ck<N)
             {
@@ -474,7 +517,11 @@ void bufferWrite(fileNameToCoodinateList intable,FILE *mnistfile,FILE* labellog,
 
 }
 
-
-
+void writeDisk(float *p,FILE *filename,long filelength){
+    char sBuf[1960000];
+    setvbuf(filename,sBuf,_IOFBF,196000);
+    fwrite(&p,4,filelength,filename);
+}
+//int readDisk(float *p,FILE *filename)
 
 }

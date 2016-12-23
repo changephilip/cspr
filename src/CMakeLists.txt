@@ -26,6 +26,7 @@ target_link_libraries(libmrcprocess ${OpenCV_LIBS})
 add_library(libcml STATIC cml.h cml.cpp)
 target_link_libraries(libcml ${OpenCV_LIBS} libmnistload libmrcparser libmrcprocess)
 #executable projects
+add_library(cml_nocv STATIC cml_nocv.h cml_nocv.cpp)
 
 add_executable(PickerCNN PickerCNN.cpp)
 target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
@@ -39,11 +40,13 @@ target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 #target_link_libraries(cmlt libmrcprocess )
 
 #cml_va
-add_executable(cml_va cml_va.cpp)
-target_link_libraries(cml_va libcml)
+#add_executable(cml_va cml_va.cpp)
+#target_link_libraries(cml_va libcml)
 
 add_executable(cml_dcv cml_dcv.cpp)
 target_link_libraries(cml_dcv libcml)
-
+#cml_nocv
+add_executable(cml_clus cml_clus.cpp)
+target_link_libraries(cml_clus cml_nocv)
 add_executable(test_mpi test_mpi.cpp)
 #target_link_libraries(test_mpi ${OpenMP_LIBS})

@@ -36,6 +36,7 @@ namespace CML {
     float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size);
     bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size);
     cml_tuple NCC_value(float *Ci,float *Cj,int after_dft_size);
+    cml_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size);
 //    void voting_algo(int *hist,float *p,int projection_i,int projection_j,int VA_length);
     void cml_read(float *data,fileNameToCoodinateList intable,int cml_size);
     void cml_dftread(float *data, fileNameToCoodinateList intable, int cml_size, int dft_size, int N);
@@ -46,6 +47,7 @@ namespace CML {
     fileNameToCoodinateList CNNpicker(ifstream &file);
     int calMnistItem(fileNameToCoodinateList intable);
     void bufferWrite(fileNameToCoodinateList intable,FILE *mnistfile,FILE* labellog,int sub_size);
+    void writeDisk(float *p,FILE *filename,long filelength);
 }
 
 #endif // CML_H
