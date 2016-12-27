@@ -31,7 +31,8 @@ add_library(cml_nocv STATIC cml_nocv.h cml_nocv.cpp)
 add_executable(PickerCNN PickerCNN.cpp)
 target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 
-
+add_executable(cml_trans cml_trsd.cpp)
+target_link_libraries(cml_trans libcml)
 #test program
 #add_executable(dft dft.cpp)
 #target_link_libraries(dft ${OpenCV_LIBS})

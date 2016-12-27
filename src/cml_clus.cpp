@@ -1,6 +1,6 @@
 #include "cml_nocv.h"
 #include <time.h>
-#include <array>>
+//#include <array>>
 #include <algorithm>
 int main(int argc ,char* argv[]){
     int oc;                     /*选项字符 */
@@ -106,8 +106,9 @@ int main(int argc ,char* argv[]){
             for (j=i+1;j<N;j++){
                 alpha_ij=((2*N-1-i)*i/2+j-(i+1));
                 float tmp_voting[N];
-//                float tmp_hist[T]={0.0};
-                std::array<float,T> tmp_hist={0.0};
+                float tmp_hist[T]={0.0};
+                const int step=sizeof(tmp_hist)/sizeof(float);
+//                std::array<float,60> tmp_hist={0.0};
     #pragma omp parallel for
                 for (k=0;k<N;k++){
 
@@ -119,12 +120,12 @@ int main(int argc ,char* argv[]){
                         tmp_voting[k]=-10.0;
                     }
                 }
-                if(i==1 and j==4){
-                    printf("\ntest tmp_voting alpha 0 1\n");
-                    for (int q=0;q<N;q++){
-                        printf("%f\t",tmp_voting[q]);
-                    }
-                }
+/*                if(i==56 and j==93){
+//                    printf("\ntest tmp_voting alpha 0 1\n");
+//                    for (int q=0;q<N;q++){
+//                        printf("%f\t",tmp_voting[q]);
+//                    }
+                   }*/
                 for (int m=0;m<N;m++){
 
                         float tmp=tmp_voting[m];
@@ -136,21 +137,22 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
-                if(i==1 and j==4){
+/*                if(i==56 and j==93){
 //                    printf("alpha_ij 1 2\t%f\n",tmp_voting[]);
-                    printf("\ntest hist alpha 0 1\n");
+//                    printf("\ntest hist alpha 0 1\n");
 
-                    for (int q=0;q<T;q++){
-                        printf("%f\t",tmp_hist[q]);
-                    }
-                }
+//                    for (int q=0;q<T;q++){
+//                        printf("%f\t",tmp_hist[q]);
+//                    }
+//                }
 //                for (int m=0;m<T;m++){
 //                    int inital=0;
 //                    float max_in
-//                }
+                }*/
 //                hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
 //                hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
-//                hist_peak[alpha_ij]=std::min_element(tmp_hist.begin(),tmp_hist.end(),<;start here
+                hist_peak[alpha_ij]=*std::max_element(tmp_hist,tmp_hist+step);
+                hist_index[alpha_ij]=std::distance(tmp_hist,max_element(tmp_hist,tmp_hist+step));
             }
         }
         t_end=time(NULL);

@@ -165,7 +165,7 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
-            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            value[i][j] = FNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
 //            printf("\n000003");
         }
 
