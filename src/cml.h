@@ -48,6 +48,7 @@ namespace CML {
     int calMnistItem(fileNameToCoodinateList intable);
     void bufferWrite(fileNameToCoodinateList intable,FILE *mnistfile,FILE* labellog,int sub_size);
     void writeDisk(float *p,FILE *filename,long filelength);
+
 }
 
 #endif // CML_H

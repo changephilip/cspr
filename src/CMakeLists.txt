@@ -5,6 +5,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -O2 -std=c++11 -fopenmp")
 ##first find PkgConfig
 #find_package(PkgConfig)
 find_package(OpenCV REQUIRED)
+#find_package(OpenBlas REQUIRED)
 #find_package(OpenMP REQUIRED)
 #find_package(FFTW3 REQUIRED)
 #pkg_check_modules(cv opencv)
@@ -27,7 +28,7 @@ add_library(libcml STATIC cml.h cml.cpp)
 target_link_libraries(libcml ${OpenCV_LIBS} libmnistload libmrcparser libmrcprocess)
 #executable projects
 add_library(cml_nocv STATIC cml_nocv.h cml_nocv.cpp)
-
+target_link_libraries(cml_nocv /usr/lib/libopenblas.a)
 add_executable(PickerCNN PickerCNN.cpp)
 target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 

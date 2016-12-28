@@ -90,6 +90,41 @@ float FNCC(float *cml1,float *cml2,int CML_SIZE){
     return ncc;
 }
 
+float BNCC(const float *cml1,const float *cml2,int CML_SIZE){
+    float ncc;
+    float sigma1;
+    float sigma2;
+    float mean1;
+    float mean2;
+    float sum1;
+    float sum2;
+    float sigma1_pow;
+    float sigma2_pow;
+    sum1=cblas_sasum(CML_SIZE,cml1,1);
+    sum2=cblas_sasum(CML_SIZE,cml2,1);
+    mean1 = sum1 / CML_SIZE;
+    mean2 = sum2 / CML_SIZE;
+    sigma1_pow=cblas_sdot(CML_SIZE,cml1,1,cml1,1)+CML_SIZE*mean1*mean1-2*mean1*sum1;
+    sigma2_pow=cblas_sdot(CML_SIZE,cml2,1,cml2,1)+CML_SIZE*mean2*mean2-2*mean2*sum2;
+
+    sigma1=sqrt(sigma1_pow/CML_SIZE);
+    sigma2=sqrt(sigma2_pow/CML_SIZE);
+    float coeff;
+    coeff = 1/(float(CML_SIZE)*sigma1*sigma2);
+//    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
+    float ncc_fft;
+    float ncc_2;
+    float ncc_3;
+    float ncc_4;
+    ncc_2 = CML_SIZE*mean1*mean2;
+    ncc_3 = mean1*sum2;
+    ncc_4 = mean2*sum1;
+    ncc_fft=cblas_sdot(CML_SIZE,cml1,1,cml2,1);
+    ncc=coeff*(ncc_fft+ncc_2-ncc_3-ncc_4);
+    //printf("\n in NCC0\n");
+//    printf("\t%f\t",ncc);
+    return ncc;
+}
 
 float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
@@ -165,7 +200,7 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
-            value[i][j] = FNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            value[i][j] = BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
 //            printf("\n000003");
         }
 
@@ -198,15 +233,15 @@ cmlncv_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size){
     printf("\n");
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
-#pragma omp parallel for
+//#pragma omp parallel for
 
         for(j=0;j<after_dft_size;j++){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
             value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
-            float fncc_v= FNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
-            printf(",%f",(fabs((value[i][j]-fncc_v)/fncc_v)));
+            float fncc_v= BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+            printf("%f\t%f\t",value[i][j],fncc_v);
 //            printf("\n000003");
         }
         printf("\n");

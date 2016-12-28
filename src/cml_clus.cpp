@@ -120,12 +120,12 @@ int main(int argc ,char* argv[]){
                         tmp_voting[k]=-10.0;
                     }
                 }
-/*                if(i==56 and j==93){
-//                    printf("\ntest tmp_voting alpha 0 1\n");
-//                    for (int q=0;q<N;q++){
-//                        printf("%f\t",tmp_voting[q]);
-//                    }
-                   }*/
+                if(i==0 and j==2){
+                    printf("\ntest tmp_voting alpha 0 2\n");
+                    for (int q=0;q<N;q++){
+                        printf("%f\t",tmp_voting[q]);
+                    }
+                   }
                 for (int m=0;m<N;m++){
 
                         float tmp=tmp_voting[m];
@@ -137,18 +137,17 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
-/*                if(i==56 and j==93){
-//                    printf("alpha_ij 1 2\t%f\n",tmp_voting[]);
-//                    printf("\ntest hist alpha 0 1\n");
+                if(i==0 and j==2){
+                    printf("\ntest hist alpha 0 1\n");
 
-//                    for (int q=0;q<T;q++){
-//                        printf("%f\t",tmp_hist[q]);
-//                    }
-//                }
+                    for (int q=0;q<T;q++){
+                        printf("%f\t",tmp_hist[q]);
+                    }
+                }
 //                for (int m=0;m<T;m++){
 //                    int inital=0;
 //                    float max_in
-                }*/
+//                }
 //                hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
 //                hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
                 hist_peak[alpha_ij]=*std::max_element(tmp_hist,tmp_hist+step);
@@ -164,6 +163,10 @@ int main(int argc ,char* argv[]){
                 printf("alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[i],hist_peak[index]);
             }
         }
+//        printf("test ncc0 and bncc\n");
+//        float ncc0=CMLNCV::NCC0(lineardft_matrix,&lineardft_matrix[200],dft_size);
+//        float bncc=CMLNCV::BNCC(lineardft_matrix,&lineardft_matrix[200],dft_size);
+//        printf("ncc0 %f\tbncc %f\n",ncc0,bncc);
         delete[] lineardft_matrix;
         delete[] hist_index;
         delete[] hist_peak;
