@@ -9,9 +9,10 @@ int main(int argc ,char* argv[]){
 //    int directreaddisk_flag=0;
     int cml_size=0;
     int N=-1;
+    char* filename;
 //    char* directdiskfile;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:n:")) != -1)
+    while((oc = getopt(argc, argv, "s:n:f:")) != -1)
     {
         switch(oc)
         {
@@ -25,11 +26,18 @@ int main(int argc ,char* argv[]){
         case 'n':
             N=atoi(optarg);
             break;
+        case 'f':
+            filename=optarg;
+            break;
         }
     }
     printf("cml_size\t%d\n",cml_size);
     printf("N\t%d\n",N);
     printf("00002\n");
+    if (!filename) {
+        printf("-f filename's abstract path is needed");
+        exit(EXIT_FAILURE);
+    }
     if (N==-1 or cml_size==0){
         printf("-n N and -s dft_cml_size are both needed,if N=0,then N=max\n");
         exit(EXIT_FAILURE);
@@ -41,7 +49,8 @@ int main(int argc ,char* argv[]){
     int dft_size=cml_size;
     int dft_size_pow=dft_size*dft_size;
     FILE *f;
-    f=fopen("qjq_data","rb");
+//    f=fopen("/home/qjq/data/qjq_200_data","rb");
+    f=fopen(filename,"rb");
     long filelength;
     fseek(f,0,SEEK_END);
     filelength=ftell(f);
@@ -148,10 +157,10 @@ int main(int argc ,char* argv[]){
 //                    int inital=0;
 //                    float max_in
 //                }
-//                hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
-//                hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
-                hist_peak[alpha_ij]=*std::max_element(tmp_hist,tmp_hist+step);
-                hist_index[alpha_ij]=std::distance(tmp_hist,max_element(tmp_hist,tmp_hist+step));
+                hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
+                hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
+//                hist_peak[alpha_ij]=*std::max_element(tmp_hist,tmp_hist+step);
+//                hist_index[alpha_ij]=std::distance(tmp_hist,max_element(tmp_hist,tmp_hist+step));
             }
         }
         t_end=time(NULL);
@@ -160,7 +169,7 @@ int main(int argc ,char* argv[]){
         for (i=0;i<N;i++){
             for(j=i+1;j<N;j++){
                 int index=(2*N-1-i)*i/2+j-(i+1);
-                printf("alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[i],hist_peak[index]);
+                printf("alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[index],hist_peak[index]);
             }
         }
 //        printf("test ncc0 and bncc\n");

@@ -8,18 +8,18 @@ int main()
     int i;
 
 
-    cml_size=200;
+    cml_size=140;
     int dft_size=cv::getOptimalDFTSize(cml_size);
     int dft_size_pow=dft_size*dft_size;
 //    std::ifstream mainMrcStarFile("/home/qjq/data/shiny-200-pf.star");
     printf("%d\tdFt_size\n",dft_size);
 //    fileNameToCoodinateList table=CML::CNNpicker(mainMrcStarFile);
-    int numItem = 25530;
+    int numItem = 1000;
     FILE *f;
     FILE *fmrc;
-    fmrc=fopen("/home/qjq/data/shiny-200-pf.mrcs","rb");
+    fmrc=fopen("/home/qjq/data/simProj-128_prenoise_norm-pf.mrcs","rb");
     printf("000001\n");
-    f=fopen("/home/qjq/data/qjq_200_data","wb");
+    f=fopen("/home/qjq/data/qjq_simu_140_data","wb");
     printf("000002\n");
     printf("\nnumItem\t%d\n",numItem);
     printf("\nmalloc success\n");
