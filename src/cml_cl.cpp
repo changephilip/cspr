@@ -1,4 +1,4 @@
-#include "cml_nocv.h"
+#include "cml_cl.h"
 
 namespace CMLNCV{
 
@@ -55,7 +55,6 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
 //    printf("\t%f\t",ncc);
     return ncc;
 }
-
 
 float FNCC(float *cml1,float *cml2,int CML_SIZE){
     //cml1,cml2,length=CML_SIZE,one-dem array
@@ -126,6 +125,129 @@ float BNCC(const float *cml1,const float *cml2,int CML_SIZE){
     return ncc;
 }
 
+float CLBNCC(const float *cml1,const float *cml2,int CML_SIZE){
+    float ncc;
+    float sigma1;
+    float sigma2;
+    float mean1;
+    float mean2;
+    float sum1;
+    float sum2;
+    float sigma1_pow;
+    float sigma2_pow;
+    float ncc_fft;
+    struct timeval tsBegin,tsEnd;
+    cl_int err;
+    cl_platform_id platform = 0;
+    cl_device_id device = 0;
+    cl_context_properties props[3] = { CL_CONTEXT_PLATFORM, 0, 0 };
+    cl_context ctx = 0;
+    cl_command_queue queue = 0;
+
+    cl_mem bufcml1, bufsum1, bufcml2, bufsum2, buf_scratch, bufsigma1_pow, bufsigma2_pow, buf_scratch2, buffft, buf_scratch_fft;
+    cl_event event = NULL;
+
+
+    gettimeofday(&tsBegin,NULL);
+
+    /* Setup OpenCL environment. */
+    err = clGetPlatformIDs( 1, &platform, NULL );
+    err = clGetDeviceIDs( platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL );
+    props[1] = (cl_context_properties)platform;
+    ctx = clCreateContext( props, 1, &device, NULL, NULL, &err );
+    queue = clCreateCommandQueue( ctx, device, 0, &err );
+
+    /* Setup clBLAS */
+    err = clblasSetup( );
+
+    /* Prepare OpenCL memory objects and place matrices inside them. */
+    bufcml1 = clCreateBuffer(ctx, CL_MEM_READ_ONLY,CML_SIZE*sizeof(*cml1),NULL, &err);
+    bufcml2 = clCreateBuffer(ctx, CL_MEM_READ_ONLY,CML_SIZE*sizeof(float),NULL, &err);
+    buf_scratch = clCreateBuffer(ctx, CL_MEM_READ_WRITE, 2*CML_SIZE*sizeof(*cml1), NULL, &err);
+
+
+    bufsum1 = clCreateBuffer(ctx, CL_MEM_READ_WRITE,sizeof(float), NULL, &err);
+    bufsum2 = clCreateBuffer(ctx, CL_MEM_READ_WRITE,sizeof(float), NULL, &err);
+    bufsigma1_pow = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(float), NULL, &err);
+    bufsigma2_pow = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(float), NULL, &err);
+    buf_scratch2 = clCreateBuffer(ctx, CL_MEM_READ_WRITE, CML_SIZE*sizeof(float), NULL, &err);
+    buffft = clCreateBuffer(ctx, CL_MEM_READ_WRITE, sizeof(float), NULL, &err);
+    buf_scratch_fft = clCreateBuffer(ctx, CL_MEM_READ_WRITE, CML_SIZE*sizeof(float), NULL, &err);
+
+    err = clEnqueueWriteBuffer( queue, bufcml1, CL_FALSE, 0,
+        CML_SIZE * sizeof( float ), cml1, 0, NULL, NULL );
+    err = clEnqueueWriteBuffer( queue, bufcml2, CL_FALSE, 0,
+        CML_SIZE * sizeof( float ), cml2, 0, NULL, NULL);
+//    printf("\n enqueue write buffer %d\n",err);
+/* Call clBLAS extended function. Perform gemm for the lower right sub-matrices */
+
+//    sum1=cblas_sasum(CML_SIZE,cml1,1);
+
+    err = clblasSasum( CML_SIZE, bufsum1, 0, bufcml1, 0, 1, buf_scratch, 1, &queue, 0, NULL, &event);
+    /* Wait for calculations to be finished. */
+//    err = clWaitForEvents( 1, &event );
+    /* Fetch results of calculations from GPU memory. */
+    err = clEnqueueReadBuffer( queue, bufsum1, CL_FALSE, 0, sizeof(sum1), &sum1, 0, NULL, NULL);
+
+
+
+    err = clblasSasum( CML_SIZE, bufsum2, 0, bufcml2, 0, 1, buf_scratch, 1, &queue, 0, NULL, &event);
+//    err = clWaitForEvents( 1, &event );
+    err = clEnqueueReadBuffer( queue, bufsum2, CL_FALSE, 0, sizeof(sum2), &sum2, 0, NULL, NULL);
+
+
+    err = clblasSdot( CML_SIZE, bufsigma1_pow, 0, bufcml1, 0, 1, bufcml1, 0, 1, buf_scratch2, 1, &queue, 0,NULL,&event);
+//    err = clWaitForEvents( 1, &event );
+    err = clEnqueueReadBuffer( queue, bufsigma1_pow, CL_FALSE, 0,sizeof(sigma1_pow), &sigma1_pow, 0, NULL, NULL);
+
+    err = clblasSdot( CML_SIZE, bufsigma2_pow, 0, bufcml2, 0, 1, bufcml2, 0, 1, buf_scratch2, 1, &queue, 0,NULL,&event);
+//    err = clWaitForEvents( 1, &event );
+    err = clEnqueueReadBuffer( queue, bufsigma2_pow, CL_FALSE, 0,sizeof(sigma2_pow), &sigma2_pow, 0, NULL, NULL);
+
+    err = clblasSdot( CML_SIZE, buffft, 0, bufcml1, 0, 1, bufcml2, 0, 1, buf_scratch_fft, 1, &queue, 0,NULL,&event);
+//    err = clWaitForEvents( 1, &event );
+    err = clEnqueueReadBuffer( queue, buffft, CL_FALSE, 0,sizeof(ncc_fft), &ncc_fft, 0, NULL, NULL);
+
+    clReleaseMemObject( bufcml1 );
+    clReleaseMemObject( bufcml2 );
+    clReleaseMemObject( buf_scratch );
+    clReleaseMemObject( bufsigma1_pow);
+    clReleaseMemObject( bufsigma2_pow);
+    clReleaseMemObject( buf_scratch2);
+    clReleaseMemObject( buffft);
+    clReleaseMemObject( buf_scratch_fft );
+    clblasTeardown( );
+    clReleaseCommandQueue( queue );
+    clReleaseContext( ctx );
+//    printf("\nsum1 %f\n",sum1);
+//    sum2=cblas_sasum(CML_SIZE,cml2,1);
+    mean1 = sum1 / CML_SIZE;
+    mean2 = sum2 / CML_SIZE;
+//    sigma1_pow=cblas_sdot(CML_SIZE,cml1,1,cml1,1)+CML_SIZE*mean1*mean1-2*mean1*sum1;
+//    sigma2_pow=cblas_sdot(CML_SIZE,cml2,1,cml2,1)+CML_SIZE*mean2*mean2-2*mean2*sum2;
+    sigma1_pow=sigma1_pow+CML_SIZE*mean1*mean1-2*mean1*sum1;
+    sigma2_pow=sigma2_pow+CML_SIZE*mean2*mean2-2*mean2*sum2;
+
+    sigma1=sqrt(sigma1_pow/CML_SIZE);
+    sigma2=sqrt(sigma2_pow/CML_SIZE);
+    float coeff;
+    coeff = 1/(float(CML_SIZE)*sigma1*sigma2);
+//    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
+
+    float ncc_2;
+    float ncc_3;
+    float ncc_4;
+    ncc_2 = CML_SIZE*mean1*mean2;
+    ncc_3 = mean1*sum2;
+    ncc_4 = mean2*sum1;
+//    ncc_fft=cblas_sdot(CML_SIZE,cml1,1,cml2,1);
+    ncc=coeff*(ncc_fft+ncc_2-ncc_3-ncc_4);
+    //printf("\n in NCC0\n");
+    gettimeofday(&tsEnd,NULL);
+    printf("\t%ld\t",1000000L*(tsEnd.tv_sec-tsBegin.tv_sec)+tsEnd.tv_usec-tsBegin.tv_usec);
+    return ncc;
+}
+
 float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
 //    double two_pi=6.28318530;
@@ -190,18 +312,18 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
     int i,j;
     float value_ini=-10.0;
     float value[after_dft_size][after_dft_size];
-//    float *p1;
-//    float *p2;
+//    cl_int err;
+//    cl_platform_id platform = 0;
+//    cl_device_id device = 0;
+//    cl_context_properties props[3] = { CL_CONTEXT_PLATFORM, 0, 0 };
+//    cl_context ctx = 0;
+//    cl_command_queue queue = 0;
     //mpi here
     for(i=0;i<after_dft_size;i++){
-//        printf("\n000001");
-#pragma omp parallel for
+
+//#pragma omp parallel for
         for(j=0;j<after_dft_size;j++){
-//            p1 = Ci[i*after_dft_size];
-//            p2 = Cj[j*after_dft_size];
-//            printf("\n0000002");
-            value[i][j] = BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
-//            printf("\n000003");
+            value[i][j] = CLBNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
         }
 
     }
@@ -219,114 +341,6 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
     return ret;
 }
-
-cmlncv_tuple NCC_Q(float *Ci,float *Cj,int after_dft_size){
-//  Ci,Cj,two-dem matrix
-//  change to one-d array
-    cmlncv_tuple ret;
-    int i,j;
-    float value_ini=-10.0;
-    float value[after_dft_size][after_dft_size];
-    float Qci[after_dft_size][4];
-    float Qcj[after_dft_size][4];
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qci[i][0] = cblas_sasum( after_dft_size, &Ci[i*after_dft_size], 1);//sum
-        Qci[i][1] = Qci[i][0] / after_dft_size;//mean
-        Qci[i][2] = cblas_sdot( after_dft_size, &Ci[i*after_dft_size], 1,&Ci[i*after_dft_size],1);//dot
-        Qci[i][3] = sqrt((Qci[i][2] + after_dft_size*Qci[i][0]*Qci[i][0] - 2*Qci[i][0]*Qci[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qcj[i][0] = cblas_sasum( after_dft_size, &Cj[i*after_dft_size], 1);//sum
-        Qcj[i][1] = Qcj[i][0] / after_dft_size;//mean
-        Qcj[i][2] = cblas_sdot( after_dft_size, &Cj[i*after_dft_size],1, &Cj[i*after_dft_size],1);//dot
-        Qcj[i][3] = sqrt((Qci[i][2] + after_dft_size*Qcj[i][0]*Qcj[i][0] - 2*Qcj[i][0]*Qcj[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-
-
-    //mpi here
-    for(i=0;i<after_dft_size;i++){
-//        printf("\n000001");
-#pragma omp parallel for
-        for(j=0;j<after_dft_size;j++){
-            //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
-            value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][2]*Qci[i][3]);
-        }
-
-    }
-    for(i=0;i<after_dft_size;i++){
-        for(j=0;j<after_dft_size;j++){
-//            printf("\t%f\t",value[i][j]);
-            if (value[i][j]>value_ini) {
-                value_ini = value[i][j];
-                ret.x=i;
-                ret.y=j;
-            }
-//            else break;
-        }
-    }
-//    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
-    return ret;
-}
-
-cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size){
-//  Ci,Cj,two-dem matrix
-//  change to one-d array
-    cmlncv_tuple ret;
-    int i,j;
-    float value_ini=-10.0;
-    float value[after_dft_size][after_dft_size];
-//    float Qci[after_dft_size][4];
-//    float Qcj[after_dft_size][4];
-
-/*
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qci[i][0] = cblas_sasum( after_dft_size, &Ci[i*after_dft_size], 1);//sum
-        Qci[i][1] = Qci[i][0] / after_dft_size;//mean
-        Qci[i][2] = cblas_sdot( after_dft_size, &Ci[i*after_dft_size], 1,&Ci[i*after_dft_size],1);//dot
-        Qci[i][3] = sqrt((Qci[i][2] + after_dft_size*Qci[i][0]*Qci[i][0] - 2*Qci[i][0]*Qci[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qcj[i][0] = cblas_sasum( after_dft_size, &Cj[i*after_dft_size], 1);//sum
-        Qcj[i][1] = Qcj[i][0] / after_dft_size;//mean
-        Qcj[i][2] = cblas_sdot( after_dft_size, &Cj[i*after_dft_size],1, &Cj[i*after_dft_size],1);//dot
-        Qcj[i][3] = sqrt((Qci[i][2] + after_dft_size*Qcj[i][0]*Qcj[i][0] - 2*Qcj[i][0]*Qcj[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-*/
-//    printf("see Qci\n");
-//    printf("%f",Qci[0][1]);
-
-    //mpi here
-    for(i=0;i<after_dft_size;i++){
-//        printf("\n000001");
-#pragma omp parallel for
-        for(j=0;j<after_dft_size;j++){
-            //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
-            value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][2]*Qci[i][3]);
-//            printf("%f",value[i][j]);
-        }
-
-    }
-    for(i=0;i<after_dft_size;i++){
-        for(j=0;j<after_dft_size;j++){
-//            printf("\t%f\t",value[i][j]);
-            if (value[i][j]>value_ini) {
-                value_ini = value[i][j];
-                ret.x=i;
-                ret.y=j;
-            }
-//            else break;
-        }
-    }
-//    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
-    return ret;
-}
-
-
-
 
 cmlncv_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size){
 //  Ci,Cj,two-dem matrix
@@ -426,4 +440,5 @@ int max_float_index(float *infloat,int size_of_array){
 
 
 }
+
 

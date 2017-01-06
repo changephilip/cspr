@@ -34,6 +34,12 @@ target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 
 add_executable(cml_trans cml_trsd.cpp)
 target_link_libraries(cml_trans libcml)
+
+add_library(cmlcl STATIC cml_cl.h cml_cl.cpp)
+target_link_libraries(cmlcl /usr/lib/libopenblas.a /usr/lib/x86_64-linux-gnu/libOpenCL.so /usr/lib/libclBLAS.so)
+
+add_executable(cml_clblas cml_clblas.cpp)
+target_link_libraries(cml_clblas cmlcl)
 #test program
 #add_executable(dft dft.cpp)
 #target_link_libraries(dft ${OpenCV_LIBS})

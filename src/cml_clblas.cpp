@@ -1,6 +1,5 @@
-#include "cml_nocv.h"
+#include "cml_cl.h"
 #include <time.h>
-#include <sys/time.h>
 //#include <array>>
 #include <algorithm>
 int main(int argc ,char* argv[]){
@@ -67,7 +66,6 @@ int main(int argc ,char* argv[]){
     printf("00003\n");
 
     int t_start,t_read_file,t_ncc_value,t_end;
-    struct timeval tsBegin,tsEnd;
     t_start=time(NULL);
 
 
@@ -89,8 +87,7 @@ int main(int argc ,char* argv[]){
     fread(lineardft_matrix,sizeof(float),malloc_size,f);
     t_read_file=time(NULL);
     printf("%f\t%f\n",lineardft_matrix[0],lineardft_matrix[1]);
-//计算cml_pair_matrix 旧方法
-/*
+//计算cml_pair_matrix
     for (i=0;i<N;i++){
         for (j=0;j<N;j++){
             if (i==j){
@@ -98,75 +95,12 @@ int main(int argc ,char* argv[]){
             }
             else {
                 cmlncv_tuple tmp;
-//                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
-                tmp=CMLNCV::NCC_Q(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
                 cml_pair_matrix[i][j]=tmp.x;
                 cml_pair_matrix[j][i]=tmp.y;
             }
         }
     }
-*/
-//cml_pair_matrix 新方法
-    float **total_nccq[N];
-//    float ;
-//    total_nccq = new float** [N];
-    int postion;
-    for (i=0;i<N;i++){
-        total_nccq[i] = new float* [dft_size];
-    }
-    for (i=0;i<N;i++){
-        for (j=0;j<dft_size;j++){
-            total_nccq[i][j] = new float[4];
-        }
-    }
-//    printf("000005\n");
-    gettimeofday(&tsBegin,NULL);
-    for (i=0;i<N;i++){
-        #pragma omp parallel for
-        for (j=0;j<dft_size;j++){
-            postion=i*dft_size_pow+j*dft_size;
-//            printf("000006\n");
-            total_nccq[i][j][0] = cblas_sasum( dft_size, &lineardft_matrix[postion], 1);//sum
-//            printf("000007\n");
-            total_nccq[i][j][1] = total_nccq[i][j][0] / dft_size;//mean
-//            printf("000008\n");
-            total_nccq[i][j][2] = cblas_sdot( dft_size, &lineardft_matrix[postion], 1,&lineardft_matrix[postion],1);//dot
-//            printf("000009\n");
-            total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + dft_size*total_nccq[i][j][0]*total_nccq[i][j][0] - 2*total_nccq[i][j][0]*total_nccq[i][j][1])/dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-        }
-    }
-    gettimeofday(&tsEnd,NULL);
-    printf("\t%ld\t\n",1000000L*(tsEnd.tv_sec-tsBegin.tv_sec)+tsEnd.tv_usec-tsBegin.tv_usec);
-//    for (i=0;i<10000;i++){
-    gettimeofday(&tsBegin,NULL);
-
-    for (i=0;i<N;i++){
-    #pragma omp parallel for
-        for (j=0;j<N;j++){
-            if (i==j){
-                cml_pair_matrix[i][j]=-1;
-            }
-            else {
-                cmlncv_tuple tmp;
-//                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
-                tmp=CMLNCV::NCC_QT(total_nccq[i],total_nccq[j],&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
-                cml_pair_matrix[i][j]=tmp.x;
-                cml_pair_matrix[j][i]=tmp.y;
-            }
-        }
-    }
-    gettimeofday(&tsEnd,NULL);
-    printf("\t%ld\t\n",1000000L*(tsEnd.tv_sec-tsBegin.tv_sec)+tsEnd.tv_usec-tsBegin.tv_usec);
-
-
-    float tmp;
-    gettimeofday(&tsBegin,NULL);
-        #pragma omp parallel for
-    for (i=0;i<N*N*dft_size_pow;i++){
-        tmp=cblas_sdot( dft_size, &lineardft_matrix[0], 1,&lineardft_matrix[dft_size],1);
-    }
-    gettimeofday(&tsEnd,NULL);
-    printf("\t%ld\t\n",1000000L*(tsEnd.tv_sec-tsBegin.tv_sec)+tsEnd.tv_usec-tsBegin.tv_usec);
         t_ncc_value=time(NULL);
         printf("\ncml_pari_matrix 0\n");
         for (i=0;i<N;i++){
@@ -248,20 +182,9 @@ int main(int argc ,char* argv[]){
         for (i=0;i<N;i++){
             delete[] cml_pair_matrix[i];
         }
-//        delete[] cml_pair_matrix;
-        for (i=0;i<N;i++){
-            for (j=0;j<dft_size;j++){
-                delete[] total_nccq[i][j];
-            }
-        }
-        for (i=0;i<N;i++){
-            delete[] total_nccq[i];
-        }
-//        delete[] total_nccq;
         printf("\n time read file\t%d",t_read_file-t_start);
         printf("\n time ncc value\t%d",t_ncc_value-t_read_file);
         printf("\n time voting\t%d",t_end-t_ncc_value);
-//        printf("\n time cblas1\t%d",t_cblas1-t_read_file);
-
         return 0;
 }
+
