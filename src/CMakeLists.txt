@@ -28,18 +28,18 @@ add_library(libcml STATIC cml.h cml.cpp)
 target_link_libraries(libcml ${OpenCV_LIBS} libmnistload libmrcparser libmrcprocess)
 #executable projects
 add_library(cml_nocv STATIC cml_nocv.h cml_nocv.cpp)
-target_link_libraries(cml_nocv /usr/lib/libopenblas.a)
+target_link_libraries(cml_nocv /usr/lib/libopenblasp-r0.2.12.a)
 add_executable(PickerCNN PickerCNN.cpp)
 target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 
 add_executable(cml_trans cml_trsd.cpp)
 target_link_libraries(cml_trans libcml)
 
-add_library(cmlcl STATIC cml_cl.h cml_cl.cpp)
-target_link_libraries(cmlcl /usr/lib/libopenblas.a /usr/lib/x86_64-linux-gnu/libOpenCL.so /usr/lib/libclBLAS.so)
+#add_library(cmlcl STATIC cml_cl.h cml_cl.cpp)
+#arget_link_libraries(cmlcl /usr/lib/libopenblas.a /usr/lib/x86_64-linux-gnu/libOpenCL.so /usr/lib/libclBLAS.so)
 
-add_executable(cml_clblas cml_clblas.cpp)
-target_link_libraries(cml_clblas cmlcl)
+#dd_executable(cml_clblas cml_clblas.cpp)
+#arget_link_libraries(cml_clblas cmlcl)
 #test program
 #add_executable(dft dft.cpp)
 #target_link_libraries(dft ${OpenCV_LIBS})
