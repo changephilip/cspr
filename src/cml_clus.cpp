@@ -7,14 +7,14 @@ int main(int argc ,char* argv[]){
     int oc;                     /*选项字符 */
     //char *b_opt_arg;            /*选项参数字串 */
 
-//    int directreaddisk_flag=0;
+
     int cml_size=0;
     int N=-1;
     int START=1;
 	int version=-1;
     int hist_flag=0;
     char* filename;
-//    char* directdiskfile;
+
     printf("00001\n");
     while((oc = getopt(argc, argv, "s:n:f:p:v:k:")) != -1)
     {
@@ -107,8 +107,26 @@ int main(int argc ,char* argv[]){
     fread(lineardft_matrix,sizeof(float),malloc_size,f);
     t_read_file=time(NULL);
     printf("%f\t%f\n",lineardft_matrix[0],lineardft_matrix[1]);
-//计算cml_pair_matrix 旧方法,a cblas version 
+//计算cml_pair_matrix 旧方法,very slow
 if (version == 0){
+    for (i=0;i<N;i++){
+#pragma omp parallel for
+        for (j=0;j<N;j++){
+            if (i==j){
+                cml_pair_matrix[i][j]=-1;
+            }
+            else {
+                cmlncv_tuple tmp;
+                tmp=CMLNCV::NCC_value0(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                //tmp=CMLNCV::NCC_Q(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                cml_pair_matrix[i][j]=tmp.x;
+                cml_pair_matrix[j][i]=tmp.y;
+            }
+        }
+    }
+}
+//a cblas version
+if (version == 1){
     for (i=0;i<N;i++){
         for (j=0;j<N;j++){
             if (i==j){
@@ -116,7 +134,7 @@ if (version == 0){
             }
             else {
                 cmlncv_tuple tmp;
-				tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
                 //tmp=CMLNCV::NCC_Q(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
                 cml_pair_matrix[i][j]=tmp.x;
                 cml_pair_matrix[j][i]=tmp.y;
@@ -125,7 +143,7 @@ if (version == 0){
     }
 }
 //using a faster version
-if (version == 1){
+if (version == 2){
     for (i=0;i<N;i++){
         for (j=0;j<N;j++){
             if (i==j){
@@ -163,7 +181,8 @@ if (version == -1){
         for (j=0;j<dft_size;j++){
             postion=i*dft_size_pow+j*dft_size;
 //            printf("000006\n");
-            total_nccq[i][j][0] = cblas_sasum( dft_size, &lineardft_matrix[postion], 1);//sum
+//            total_nccq[i][j][0] = cblas_sasum( dft_size, &lineardft_matrix[postion], 1);//sum
+            total_nccq[i][j][0] = CMLNCV::MYSUM(dft_size,&lineardft_matrix[postion]);
 //            printf("000007\n");
             total_nccq[i][j][1] = total_nccq[i][j][0] / dft_size;//mean
 //            printf("000008\n");
@@ -218,7 +237,7 @@ if (version == -1){
         t_ncc_value=time(NULL);
         printf("\ncml_pari_matrix 0\n");
         for (i=0;i<N;i++){
-            printf("%d,",cml_pair_matrix[0][1]);
+            printf("%d,",cml_pair_matrix[0][i]);
         }
 
 

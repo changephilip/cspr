@@ -298,18 +298,24 @@ void linearpolar(cv::Mat &I,cv::Mat &dst){
 void image_to_mat(cv::Mat &I,float *matp,int after_dft_size){
     int i,j,k;
     k=0;
-    cv::Mat_<float> dstf=I;
-    cv::Mat_<float>::iterator it = dstf.begin();
-    cv::Mat_<float>::iterator itend = dstf.end();
-        while (it!=itend){
-            for (i=0;i<after_dft_size;i++){
-                for (j=0;j<after_dft_size;j++){
-                    matp[k]=*it;
-                    ++it;
-                    k++;
-                }
-            }
+//    cv::Mat_<float> dstf=I;
+//    cv::Mat_<float>::iterator it = dstf.begin();
+//    cv::Mat_<float>::iterator itend = dstf.end();
+//        while (it!=itend){
+//            for (i=0;i<after_dft_size;i++){
+//                for (j=0;j<after_dft_size;j++){
+//                    matp[k]=*it;
+//                    ++it;
+//                    k++;
+//                }
+//            }
+//        }
+    for (i=0;i<after_dft_size;i++){
+        for (j=0;j<after_dft_size;j++){
+            matp[k]=I.at<float>(i,j);
+            k=k+1;
         }
+    }
 }
 
 void cml_read(float *data,fileNameToCoodinateList intable,int cml_size){

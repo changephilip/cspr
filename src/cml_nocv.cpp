@@ -13,8 +13,8 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
     float mean2;
     float sum1 = 0.0f;
     float sum2 = 0.0f;
-    float sigma1_pow=0.0f;
-    float sigma2_pow=0.0f;
+    float sigma1_dot=0.0f;
+    float sigma2_dot=0.0f;
     int i;
     for (i=0;i<CML_SIZE;i++){
         sum1 = sum1 + cml1[i] ;
@@ -23,12 +23,12 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
     mean1 = sum1 / CML_SIZE;
     mean2 = sum2 / CML_SIZE;
     for (i=0;i<CML_SIZE;i++){
-        sigma1_pow=sigma1_pow+(cml1[i]-mean1)*(cml1[i]-mean1);
-        sigma2_pow=sigma2_pow+(cml2[i]-mean2)*(cml2[i]-mean2);
+        sigma1_dot=sigma1_dot+cml1[i]*cml1[i];
+        sigma2_dot=sigma2_dot+cml2[i]*cml2[i];
     }
 
-    sigma1=sqrt(sigma1_pow/CML_SIZE);
-    sigma2=sqrt(sigma2_pow/CML_SIZE);
+    sigma1=sqrt((sigma1_dot+CML_SIZE*mean1*mean1-2*mean1*sum1)/CML_SIZE);
+    sigma2=sqrt((sigma2_dot+CML_SIZE*mean2*mean2-2*mean2*sum2)/CML_SIZE);
     float coeff;
     coeff = 1/(float(CML_SIZE)*sigma1*sigma2);
 //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
@@ -90,6 +90,15 @@ float FNCC(float *cml1,float *cml2,int CML_SIZE){
     return ncc;
 }
 
+float MYSUM(int Num,const float *p){
+    float re=0.0f;
+    int i;
+    for(i=0;i<Num;i++){
+        re=re+p[i];
+    }
+    return re;
+}
+
 float BNCC(const float *cml1,const float *cml2,int CML_SIZE){
     float ncc;
     float sigma1;
@@ -100,8 +109,8 @@ float BNCC(const float *cml1,const float *cml2,int CML_SIZE){
     float sum2;
     float sigma1_pow;
     float sigma2_pow;
-    sum1=cblas_sasum(CML_SIZE,cml1,1);
-    sum2=cblas_sasum(CML_SIZE,cml2,1);
+    sum1=MYSUM(CML_SIZE,cml1);
+    sum2=MYSUM(CML_SIZE,cml2);
     mean1 = sum1 / CML_SIZE;
     mean2 = sum2 / CML_SIZE;
     sigma1_pow=cblas_sdot(CML_SIZE,cml1,1,cml1,1)+CML_SIZE*mean1*mean1-2*mean1*sum1;
@@ -195,12 +204,49 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
     //mpi here
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
-#pragma omp parallel for
+//#pragma omp parallel for
         for(j=0;j<after_dft_size;j++){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
             value[i][j] = BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+//            printf("\n000003");
+        }
+
+    }
+    for(i=0;i<after_dft_size;i++){
+        for(j=0;j<after_dft_size;j++){
+//            printf("\t%f\t",value[i][j]);
+            if (value[i][j]>value_ini) {
+                value_ini = value[i][j];
+                ret.x=i;
+                ret.y=j;
+            }
+//            else break;
+        }
+    }
+//    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
+    return ret;
+}
+
+cmlncv_tuple NCC_value0(float *Ci,float *Cj,int after_dft_size){
+//  Ci,Cj,two-dem matrix
+//  change to one-d array
+    cmlncv_tuple ret;
+    int i,j;
+    float value_ini=-10.0;
+    float value[after_dft_size][after_dft_size];
+//    float *p1;
+//    float *p2;
+    //mpi here
+    for(i=0;i<after_dft_size;i++){
+//        printf("\n000001");
+//#pragma omp parallel for
+        for(j=0;j<after_dft_size;j++){
+//            p1 = Ci[i*after_dft_size];
+//            p2 = Cj[j*after_dft_size];
+//            printf("\n0000002");
+            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
 //            printf("\n000003");
         }
 
@@ -229,16 +275,18 @@ cmlncv_tuple NCC_Q(float *Ci,float *Cj,int after_dft_size){
     float value[after_dft_size][after_dft_size];
     float Qci[after_dft_size][4];
     float Qcj[after_dft_size][4];
-#pragma omp parallel for
+//#pragma omp parallel for
     for (i=0;i<after_dft_size;i++){
-        Qci[i][0] = cblas_sasum( after_dft_size, &Ci[i*after_dft_size], 1);//sum
+//        Qci[i][0] = cblas_sasum( after_dft_size, &Ci[i*after_dft_size], 1);//sum
+        Qci[i][0] = MYSUM(after_dft_size,&Ci[i*after_dft_size]);
         Qci[i][1] = Qci[i][0] / after_dft_size;//mean
         Qci[i][2] = cblas_sdot( after_dft_size, &Ci[i*after_dft_size], 1,&Ci[i*after_dft_size],1);//dot
         Qci[i][3] = sqrt((Qci[i][2] + after_dft_size*Qci[i][1]*Qci[i][1] - 2*Qci[i][0]*Qci[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
     }
-#pragma omp parallel for
+//#pragma omp parallel for
     for (j=0;j<after_dft_size;j++){
-        Qcj[j][0] = cblas_sasum( after_dft_size, &Cj[j*after_dft_size], 1);//sum
+//        Qcj[j][0] = cblas_sasum( after_dft_size, &Cj[j*after_dft_size], 1);//sum
+        Qcj[j][0] = MYSUM(after_dft_size,&Cj[j*after_dft_size]);
         Qcj[j][1] = Qcj[j][0] / after_dft_size;//mean
         Qcj[j][2] = cblas_sdot( after_dft_size, &Cj[j*after_dft_size],1, &Cj[j*after_dft_size],1);//dot
         Qcj[j][3] = sqrt((Qcj[j][2] + after_dft_size*Qcj[j][1]*Qcj[j][1] - 2*Qcj[j][0]*Qcj[j][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
@@ -248,7 +296,7 @@ cmlncv_tuple NCC_Q(float *Ci,float *Cj,int after_dft_size){
     //mpi here
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
-#pragma omp parallel for
+//#pragma omp parallel for
         for(j=0;j<after_dft_size;j++){
             //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
             value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
@@ -302,7 +350,7 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
     //mpi here
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
-#pragma omp parallel for
+//#pragma omp parallel for
         for(j=0;j<after_dft_size;j++){
             //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
             value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
@@ -349,7 +397,7 @@ cmlncv_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size){
 //            printf("\n0000002");
             value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
             float fncc_v= BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
-            printf("%f\t%f\t",value[i][j],fncc_v);
+            printf("%f\t%f\t\n",value[i][j],fncc_v);
 //            printf("\n000003");
         }
         printf("\n");
