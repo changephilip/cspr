@@ -369,6 +369,11 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
 //            else break;
         }
     }
+    //to deal with value_ini<0.7,the ncc_value shouldn't be too small
+    if (value_ini<0.7){
+        ret.x=-1;
+        ret.y=-1;
+    }
 //    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
     return ret;
 }

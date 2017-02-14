@@ -121,7 +121,7 @@ int main(int argc ,char* argv[]){
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=1000;
+        iteration_size=800;
         int n_iteration;
 
         int last_iteration=N%iteration_size;
@@ -276,7 +276,7 @@ int main(int argc ,char* argv[]){
                             float tmp_hist[T]={0.0};
                             for (k=0;k<local_N;k++){
                 //                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
-                                if (k!=i and k!=j){
+                                if (k!=i and k!=j and cml_pair_matrix[i][j]!=-1 and cml_pair_matrix[i][k]!=-1 and cml_pair_matrix[j][i]!=-1 and cml_pair_matrix[j][k]!=-1 and cml_pair_matrix[k][i]!=-1 and cml_pair_matrix[k][j]!=-1) {
                                     tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
                                 }
                                 else {
@@ -313,103 +313,34 @@ int main(int argc ,char* argv[]){
             //从CML_Pair中找出优秀粒子保留，等于剔除non-particle
             //计算每一个alphaij的voting序号
             int NumOfHighPeak=0;
-            //固定threshold值，也可以计算右侧峰导数求个极值，先固定threshold
+
+            //固定threshold值，从右侧开始取第一个峰值,先固定threshold
+//            float max_hist_peak=CMLNCV::max_float(hist_peak,local_N*(local_N-1)/2);
             float threshold=local_N*1.8/10.0;
+            int Result_voted[local_N]={0};
             //找出Peak值较高的CML_pair
             for (i=0;i<local_N;i++){
                 for (j=i+1;j<local_N;j++){
                     int index = (2*local_N-1-i)*i/2+j-(i+1);
                     if (hist_peak[index]>threshold) {
                         NumOfHighPeak = NumOfHighPeak +1;
+                        Result_voted[i]=Result_voted[i]+1;
+                        Result_voted[j]=Result_voted[j]+1;
                         }
                     }
                 }
-            printf("NumOfHighPeak %d\n",NumOfHighPeak);
-            //找出贡献最多的粒子，SCHCP
-            int *Local_SCHCP[NumOfHighPeak];
-            for (i=0;i<NumOfHighPeak;i++){
-            //初始化SCHCP矩阵
-            Local_SCHCP[i] = new int [local_N];
-    //            Local_SCHCP[i] = {0};//the last two ints contain the i and j of alphaij
-            for (j=0;j<local_N;j++){
-                    Local_SCHCP[i][j]=0;
-                }
-            }
-            int P=0;//P是SCHCP矩阵的索引
-            for (i=0;i<local_N;i++){
-                for (j=i+1;j<local_N;j++){
-                    int index = (2*local_N-1-i)*i/2+j-(i+1);
-                    if (hist_peak[index]>threshold) {
-    //                    printf("0000008\n");
-                        std::vector<int> list_peak;
-                        float angle_peak=hist_index[index]*sigma;
-                        float tmp_voting[local_N];
-    //                    printf("0000009\n");
-    #pragma omp parallel for
-                        for (k=0;k<local_N;k++){
 
-            //                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
-                            if (k!=i and k!=j){
-                                tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
-                            }
-                            else {
-                                tmp_voting[k]=-10.0;
-                            }
-                        }
-                        for (int m=0;m<local_N;m++){
-                            if (tmp_voting[m]!=-10.0 and tmp_voting[m]!=-9.0){
-                                if (fabs(tmp_voting[m]-angle_peak)<sigma){
-                                    list_peak.push_back(m);
-                                }
-                            }
-                        }
-                        for (auto q : list_peak){
-                            Local_SCHCP[P][q] = 1;
-                        }
-                        Local_SCHCP[P][i]= NumOfHighPeak;
-                        Local_SCHCP[P][j]= NumOfHighPeak;
-                        P = P+1;
-                    }
-                }
-            }
-            //统计SCHCP矩阵，释放相关的堆
-            int Result[local_N]={0};
-            for (i=0;i<NumOfHighPeak;i++){
-    #pragma omp parallel for
-                for (j=0;j<local_N;j++){
-                    Result[j]=Result[j]+Local_SCHCP[i][j];
-                }
-            }
-            float Result_voting[local_N];
-            float Result_voted[local_N];
-    #pragma omp parallel for
-            for (i=0;i<local_N;i++){
-                Result_voting[i]=Result[i]%NumOfHighPeak;
-            }
-    #pragma omp parallel for
-            for (i=0;i<local_N;i++){
-                Result_voted[i]=Result[i]/NumOfHighPeak;
-            }
-    #pragma omp parallel for
-            for (i=0;i<NumOfHighPeak;i++){
-                delete[] Local_SCHCP[i];
-            }
-            float threshold_voting=NumOfHighPeak*0.6;
-            const int step=sizeof(Result_voting)/sizeof(float);
-            float threshold_voted=(*std::max_element(Result_voted,Result_voted+step))*0.6;
+
+
+            const int step=sizeof(Result_voted)/sizeof(int);
+            float threshold_voted=(*std::max_element(Result_voted,Result_voted+step))*0.5;
 //            float threshold_voting=*std::max_element(Result_voting,Reslut_voting+step)*0.8;
+            //only voted particles are trusted.
             std::vector<int> local_good_particle;
             for (i=0;i<local_N;i++){
                 if (Result_voted[i]>threshold_voted){
                     int good_voted_particle=control_struct[control][0]+i;
                     local_good_particle.push_back(good_voted_particle);
-                }
-                if (Result_voting[i]>threshold_voting){
-                    int good_voting_particle=control_struct[control][0]+i;
-                    vector<int>::iterator iter=find(local_good_particle.begin(),local_good_particle.end(),good_voting_particle);
-                    if (iter==local_good_particle.end()){
-                    local_good_particle.push_back(good_voting_particle);
-                    }
                 }
             }
             t_end=time(NULL);
@@ -452,3 +383,4 @@ int main(int argc ,char* argv[]){
 
         return 0;
 }
+
