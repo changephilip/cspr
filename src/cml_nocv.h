@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <cblas.h>
+#include <algorithm>
 using namespace std;
 typedef struct{
     int x;

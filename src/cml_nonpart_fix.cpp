@@ -17,9 +17,10 @@ int main(int argc ,char* argv[]){
     int debug_flag=0;
     char* filename;
     char* good_particle;
+    char* logfile;
 //    char* directdiskfile;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:n:f:p:v:k:id:l:h")) != -1)
+    while((oc = getopt(argc, argv, "s:n:f:p:v:k:id:l:o:h")) != -1)
     {
         switch(oc)
         {
@@ -50,6 +51,9 @@ int main(int argc ,char* argv[]){
         case 'l':
             good_particle=optarg;
             break;
+        case '0':
+            logfile=optarg;
+            break;
         case 'h':
             printf("CML_NONPART is a program that picks high quality particles and throw out non-particles\n");
             printf("Author:\tQian jiaqiang ,Fudan Univesity,15210700078@fudan.edu.cn\tHuangQiang Lab\n");
@@ -78,21 +82,32 @@ int main(int argc ,char* argv[]){
         printf("-n N and -s dft_cml_size are both needed,if N=0,then N=max\n");
         exit(EXIT_FAILURE);
     }
-    printf("cml_size\t%d\n",cml_size);
-    printf("N\t%d\n",N);
+    if (!logfile){
+        printf("-o logfile is needed.\n");
+        exit(EXIT_FAILURE);
+    }
+    FILE *OUTFILE;
+    OUTFILE=fopen(logfile,"a+");
+    fprintf(OUTFILE,"cml_size\t%d\n",cml_size);
+    fprintf(OUTFILE,"N\t%d\n",N);
 
 //全局参数设定
     int dft_size=cml_size;
     int dft_size_pow=dft_size*dft_size;
     int T;
-    T=60;
+    T=72;
     int i,j,k;
     float sigma=180.0/float(T);
     FILE *f;
     FILE *outputfile;
+    char mybuf[1024];
+    char mybuf2[1024];
+
 //    f=fopen("/home/qjq/data/qjq_200_data","rb");
     f=fopen(filename,"rb");
     outputfile=fopen(good_particle,"a+");
+    setvbuf(outputfile,mybuf,_IOLBF,1024);
+    setvbuf(OUTFILE,mybuf2,_IOLBF,1024);
     long filelength;
     fseek(f,0,SEEK_END);
     filelength=ftell(f);
@@ -101,12 +116,12 @@ int main(int argc ,char* argv[]){
         exit(EXIT_FAILURE);
     }
     rewind(f);
-    printf("length\t%ld\n",filelength);
+    fprintf(OUTFILE,"length\t%ld\n",filelength);
     if (N==0){
         N=filelength/dft_size_pow/sizeof(float);
     }
     if (N>filelength/dft_size_pow/sizeof(float)){
-        printf("N can't be larger than the max numofItem\n");
+        fprintf(OUTFILE,"N can't be larger than the max numofItem\n");
         exit(EXIT_FAILURE);
     }
 
@@ -121,7 +136,7 @@ int main(int argc ,char* argv[]){
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=800;
+        iteration_size=500;
         int n_iteration;
 
         int last_iteration=N%iteration_size;
@@ -131,7 +146,7 @@ int main(int argc ,char* argv[]){
         else {
             n_iteration=N/iteration_size+1;
         }
-        printf("n_iteration \t%d\n",n_iteration);
+        fprintf(OUTFILE,"n_iteration \t%d\n",n_iteration);
         int control_struct[n_iteration][2];
         //control_struct[local_start][this iteration's particles num]切分数据集，每个数据集为iteration_size
         for (int t=0;t<n_iteration;t++){
@@ -228,10 +243,6 @@ int main(int argc ,char* argv[]){
                         total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + dft_size*total_nccq[i][j][1]*total_nccq[i][j][1] - 2*total_nccq[i][j][0]*total_nccq[i][j][1])/dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
                     }
                 }
-//                gettimeofday(&tsEnd,NULL);
-//                printf("\t%ld\t\n",1000000L*(tsEnd.tv_sec-tsBegin.tv_sec)+tsEnd.tv_usec-tsBegin.tv_usec);
-            //    for (i=0;i<10000;i++){
-//                gettimeofday(&tsBegin,NULL);
 
                 for (i=0;i<local_N;i++){
                 #pragma omp parallel for
@@ -273,7 +284,8 @@ int main(int argc ,char* argv[]){
                         for (j=i+1;j<local_N;j++){
                             alpha_ij=((2*local_N-1-i)*i/2+j-(i+1));
                             float tmp_voting[local_N];
-                            float tmp_hist[T]={0.0};
+//                            float tmp_hist[T]={0.0};
+                            float tmp_hist[72]={0.0};
                             for (k=0;k<local_N;k++){
                 //                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
                                 if (k!=i and k!=j and cml_pair_matrix[i][j]!=-1 and cml_pair_matrix[i][k]!=-1 and cml_pair_matrix[j][i]!=-1 and cml_pair_matrix[j][k]!=-1 and cml_pair_matrix[k][i]!=-1 and cml_pair_matrix[k][j]!=-1) {
@@ -300,7 +312,7 @@ int main(int argc ,char* argv[]){
 
                         }
                     }
-            /*
+            if (hist_flag){
             fprintf(outputfile,"alpha_ij\ti\tj\thist_index\tpeak_value\n");
             for (i=0;i<local_N;i++){
                 for (j=i+1;j<local_N;j++){
@@ -308,16 +320,32 @@ int main(int argc ,char* argv[]){
                     fprintf(outputfile,"alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[index],hist_peak[index]);
                 }
             }
-            */
-            printf("\n311\n");
+            }
+            fprintf(OUTFILE,"\n311\n");
             //从CML_Pair中找出优秀粒子保留，等于剔除non-particle
             //计算每一个alphaij的voting序号
             int NumOfHighPeak=0;
 
             //固定threshold值，从右侧开始取第一个峰值,先固定threshold
+            //threshold 为r/sqrt（local_N),r为2、4、8等。排序取local_N*threshold个为符合条件者。
 //            float max_hist_peak=CMLNCV::max_float(hist_peak,local_N*(local_N-1)/2);
-            float threshold=local_N*1.8/10.0;
-            int Result_voted[local_N]={0};
+            int r=4;
+
+            //复制一个hist_peak的备份;
+            float *hist_peak_cp =  new float[local_N*(local_N-1)/2];
+            long hist_peak_size=local_N*(local_N-1)/2;
+            int threshold_top=floor((1-(r/sqrt(local_N)))*hist_peak_size);
+            for (i=0;i<hist_peak_size;i++){
+                hist_peak_cp[i]=hist_peak[i];
+            }
+            sort(hist_peak_cp,hist_peak_cp+hist_peak_size);
+            fprintf(OUTFILE,"threshold_top %d\n",threshold_top);
+            float threshold=hist_peak_cp[threshold_top-1];
+            delete[] hist_peak_cp;
+            int Result_voted[local_N];
+            for (i=0;i<local_N;i++){
+                Result_voted[i]=0;
+            }
             //找出Peak值较高的CML_pair
             for (i=0;i<local_N;i++){
                 for (j=i+1;j<local_N;j++){
@@ -333,7 +361,8 @@ int main(int argc ,char* argv[]){
 
 
             const int step=sizeof(Result_voted)/sizeof(int);
-            float threshold_voted=(*std::max_element(Result_voted,Result_voted+step))*0.5;
+            float threshold_voted=(*std::max_element(Result_voted,Result_voted+step))*0.2;
+            fprintf(OUTFILE,"threshold_voted is %f\n",threshold_voted);
 //            float threshold_voting=*std::max_element(Result_voting,Reslut_voting+step)*0.8;
             //only voted particles are trusted.
             std::vector<int> local_good_particle;
@@ -362,9 +391,9 @@ int main(int argc ,char* argv[]){
             for (i=0;i<local_N;i++){
                 delete[] cml_pair_matrix[i];
             }
-            printf("ncc_time %d\n",t_ncc_value-t_start);
-            printf("voting time %d\n",t_end-t_ncc_value);
-            printf("%d/%d\tcompleted\n",control,n_iteration);
+            fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
+            fprintf(OUTFILE,"voting time %d\n",t_end-t_ncc_value);
+            fprintf(OUTFILE,"%d/%d\tcompleted\n",control,n_iteration);
 
         }
         fclose(f);
