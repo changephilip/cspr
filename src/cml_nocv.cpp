@@ -148,14 +148,14 @@ float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int 
     return angleij*180.0/M_PI;
 }
 
-float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
+float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons2){
     double a,b,c;
 //    double two_pi=6.28318530;
     float angleij;
     double cons=180.0/M_PI;
-    a = cos(float(cmlkj-cmlki)*M_2_PI/float(after_dft_size));
-    b = cos(float(cmljk-cmlji)*M_2_PI/float(after_dft_size));
-    c = cos(float(cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    a = cos((cmlkj-cmlki)*cons2);
+    b = cos((cmljk-cmlji)*cons2);
+    c = cos((cmlik-cmlij)*cons2);
 //    if ((1-c*c)<0 or (1-b*b)<0){
 //        printf("error in cvoting\n");
 //        exit(EXIT_FAILURE);
@@ -163,27 +163,27 @@ float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int af
     float t;
     if ((1+2*a*b*c)>a*a+b*b+c*c) {
         t=(a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
-        if (t<=1 and t>=-1){
+        if (t<1 and t>-1){
         angleij = acos(t)*cons;
         }
         else if(t>=1){
-         angleij=acos(1.0)*cons;
+         angleij=0.0;
         }
         else if (t<=-1){
-         angleij=acos(-1.0)*cons;
+         angleij=180.0;
         }
     }
     else {angleij=-9.0;}
     return angleij;
 }
 
-bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
+bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons){
     double a,b,c;
 //    double two_pi=6.28318530;
 //    float cos_angleij,angleij;
-    a = cos(float(cmlkj-cmlki)*M_2_PI/float(after_dft_size));
-    b = cos(float(cmljk-cmlji)*M_2_PI/float(after_dft_size));
-    c = cos(float(cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    a = cos((cmlkj-cmlki)*cons);
+    b = cos((cmljk-cmlji)*cons);
+    c = cos((cmlik-cmlij)*cons);
     if ((1+2*a*b*c)>a*a+b*b+c*c) {
         return true;
     }

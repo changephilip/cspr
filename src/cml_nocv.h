@@ -24,7 +24,7 @@ namespace CMLNCV
     float NCC0(float *cml1,float *cml2,int CML_SIZE);
     float BNCC(const float *cml1,const float *cml2,int CML_SIZE);
     float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size);
-    bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size);
+    bool voting_condition(int cmlij, int cmlik, int cmlji, int cmljk, int cmlki, int cmlkj, float cons);
     float MYSUM(int Num,const float *p);
     cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size);
     cmlncv_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size);
@@ -33,7 +33,7 @@ namespace CMLNCV
     cmlncv_tuple NCC_value0(float *Ci,float *Cj,int after_dft_size);
     float max_float(float *infloat,int size_of_array);
     int max_float_index(float *infloat,int size_of_array);
-    float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size);
+    float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons2);
 
 }
 #endif // CML_NOCV_H

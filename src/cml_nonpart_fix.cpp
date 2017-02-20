@@ -51,7 +51,7 @@ int main(int argc ,char* argv[]){
         case 'l':
             good_particle=optarg;
             break;
-        case '0':
+        case 'o':
             logfile=optarg;
             break;
         case 'h':
@@ -61,7 +61,7 @@ int main(int argc ,char* argv[]){
             printf("-n the number of particles\n");
             printf("-f the mrcs file which contains the particles data\n");
             printf("-p the start position of particles in mrcs file,default 1\n");
-            printf("-v the calculate method we used,default -1,needn't changed");
+            //printf("-v the calculate method we used,default -1,needn't changed");
             printf("-i if you use -i,then we will try to throw out non-particles\n");
             printf("-l your output filename,which will contain the particles\n");
             exit(EXIT_SUCCESS);
@@ -126,17 +126,17 @@ int main(int argc ,char* argv[]){
     }
 
 
-    int t_start,t_read_file,t_ncc_value,t_end,t_all_end;
+    int t_start,t_read_file,t_ncc_value,t_end,t_all_end,t_vote_1,t_vote_2,t_vote_3;
     struct timeval tsBegin,tsEnd;
     t_start=time(NULL);
 
 
 //    std::vector<int> Global_good_particle;
-    int alpha_ij;
+//    int alpha_ij;
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=500;
+        iteration_size=1000;
         int n_iteration;
 
         int last_iteration=N%iteration_size;
@@ -277,41 +277,81 @@ int main(int argc ,char* argv[]){
             int *hist_index = new int[local_N*(local_N-1)/2];
             float half_pow_pi=sqrt(M_2_PI)*sigma;
             float four_sigma_pow=4*sigma*sigma;
+//            float alpha_t_alpha12;
+            float cons=M_2_PI/dft_size;
+            float Trecurse=180.0/T;
             //开始voting算法，先计算一遍voting，算出hist数组、hist_index数组
 
             //combine the voting and peak
+//            for (i=0;i<local_N;i++){
+//                        for (j=i+1;j<local_N;j++){
+//                            //be sure ij,ji!=-1;
+
+//                            alpha_ij=((2*local_N-1-i)*i/2+j-(i+1));
+//                            float tmp_voting[local_N];
+//                            float tmp_hist[72]={0.0};
+//                            #pragma omp parallel for
+//                            for (k=0;k<local_N;k++){
+//                                //....#
+//                //                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
+//                                if (k!=i and k!=j and cml_pair_matrix[i][j]>-1 and cml_pair_matrix[i][k]>-1 and cml_pair_matrix[j][i]>-1 and cml_pair_matrix[j][k]>-1 and cml_pair_matrix[k][i]>-1 and cml_pair_matrix[k][j]>-1) {
+//                                    tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],cons);
+//                                }
+//                                else {
+//                                    tmp_voting[k]=-10.0;
+//                                }
+//                            }
+
+//                            for (int m=0;m<local_N;m++){
+
+//                                    float tmp=tmp_voting[m];
+//                                    if (tmp!=-10.0 and tmp!=-9.0){
+//            #pragma omp parallel for
+//                                    for (int l=0;l<T;l++){
+//                                        float alpha_t_alpha12=(180.0*l/float(T))-tmp;
+//                                        tmp_hist[l]=tmp_hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/(four_sigma_pow))/half_pow_pi;
+//                                    }
+//                                }
+//                            }
+//                            hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
+//                           hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
+
+//                        }
+//                    }
+
+
             for (i=0;i<local_N;i++){
-                        for (j=i+1;j<local_N;j++){
-                            alpha_ij=((2*local_N-1-i)*i/2+j-(i+1));
-                            float tmp_voting[local_N];
-//                            float tmp_hist[T]={0.0};
-                            float tmp_hist[72]={0.0};
-                            for (k=0;k<local_N;k++){
-                //                alpha_ij=((2*N-1-i)*i/2+j-(i+1))*N+k;this is the error that caused difference between cml_dcv and cml_va
-                                if (k!=i and k!=j and cml_pair_matrix[i][j]!=-1 and cml_pair_matrix[i][k]!=-1 and cml_pair_matrix[j][i]!=-1 and cml_pair_matrix[j][k]!=-1 and cml_pair_matrix[k][i]!=-1 and cml_pair_matrix[k][j]!=-1) {
-                                    tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],dft_size);
+                for (j=i+1;j<local_N;j++){
+                    long int alpha_ij=((2*local_N-1-i)*i/2+j-(i+1));
+                    if (cml_pair_matrix[i][j]!=-1){
+                        float tmp_voting[local_N];
+                        float tmp_hist[T]={0.0};
+#pragma omp parallel for
+                        for (k=0;k<local_N;k++){
+                            if (k!=i and k!=j){
+                                if (cml_pair_matrix[i][k]!=-1 and cml_pair_matrix[j][k]!=-1){
+                                    tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],cons);
                                 }
-                                else {
-                                    tmp_voting[k]=-10.0;
-                                }
+                                else {tmp_voting[k]=-10.0;}
                             }
-
-                            for (int m=0;m<local_N;m++){
-
-                                    float tmp=tmp_voting[m];
-                                    if (tmp!=-10.0 and tmp!=-9.0){
-            #pragma omp parallel for
-                                    for (int l=0;l<T;l++){
-                                        float alpha_t_alpha12=(180.0*l/float(T))-tmp;
-                                        tmp_hist[l]=tmp_hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/(four_sigma_pow))/half_pow_pi;
-                                    }
-                                }
-                            }
-                            hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
-                            hist_index[alpha_ij]=CMLNCV::max_float_index(tmp_hist,T);
-
+                            else {tmp_voting[k]=-10.0;}
                         }
+                        for (int m=0;m<local_N;m++){
+                            float tmp=tmp_voting[m];
+                            if (tmp!=-10.0){
+#pragma omp parallel for
+                                for (int l=0;l<T;l++){
+                                    float alpha_t_alpha12=Trecurse*l-tmp;
+                                    tmp_hist[l]=tmp_hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/four_sigma_pow)/half_pow_pi;
+                                }
+                            }
+                        }
+                        hist_peak[alpha_ij]=CMLNCV::max_float(tmp_hist,T);
                     }
+                    hist_peak[alpha_ij]=0.0;
+                }
+            }
+            t_vote_1=time(NULL);
             if (hist_flag){
             fprintf(outputfile,"alpha_ij\ti\tj\thist_index\tpeak_value\n");
             for (i=0;i<local_N;i++){
@@ -342,6 +382,7 @@ int main(int argc ,char* argv[]){
             fprintf(OUTFILE,"threshold_top %d\n",threshold_top);
             float threshold=hist_peak_cp[threshold_top-1];
             delete[] hist_peak_cp;
+            t_vote_2=time(NULL);
             int Result_voted[local_N];
             for (i=0;i<local_N;i++){
                 Result_voted[i]=0;
@@ -351,7 +392,7 @@ int main(int argc ,char* argv[]){
                 for (j=i+1;j<local_N;j++){
                     int index = (2*local_N-1-i)*i/2+j-(i+1);
                     if (hist_peak[index]>threshold) {
-                        NumOfHighPeak = NumOfHighPeak +1;
+//                        NumOfHighPeak = NumOfHighPeak +1;
                         Result_voted[i]=Result_voted[i]+1;
                         Result_voted[j]=Result_voted[j]+1;
                         }
@@ -393,6 +434,8 @@ int main(int argc ,char* argv[]){
             }
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
             fprintf(OUTFILE,"voting time %d\n",t_end-t_ncc_value);
+            fprintf(OUTFILE,"only voting time %d\n",t_vote_1-t_ncc_value);
+            fprintf(OUTFILE,"sort time %d\n",t_vote_2-t_vote_1);
             fprintf(OUTFILE,"%d/%d\tcompleted\n",control,n_iteration);
 
         }
