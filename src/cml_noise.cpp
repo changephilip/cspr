@@ -3,6 +3,15 @@
 #include <sys/time.h>
 //#include <array>>
 #include <algorithm>
+struct voted
+{
+    int index;
+    int value;
+};
+bool comp(const voted &a,const voted &b)
+{
+    return a.value<b.value;
+}
 int main(int argc ,char* argv[]){
     int oc;                     /*选项字符 */
     //char *b_opt_arg;            /*选项参数字串 */
@@ -10,17 +19,20 @@ int main(int argc ,char* argv[]){
 //    int directreaddisk_flag=0;
     int cml_size=0;
     int N=-1;
+    int N_noise=-1;
     int START=1;
     int version=-1;
     int hist_flag=0;
     int iteration=0;
     int debug_flag=0;
+//    int noise_flag=0;
     char* filename;
     char* good_particle;
     char* logfile;
+    char* noisefile;
 //    char* directdiskfile;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:n:f:p:v:k:id:l:o:h")) != -1)
+    while((oc = getopt(argc, argv, "s:n:f:p:v:k:id:l:o:hN:")) != -1)
     {
         switch(oc)
         {
@@ -29,6 +41,9 @@ int main(int argc ,char* argv[]){
             break;
         case 'n':
             N=atoi(optarg);
+            break;
+        case 'N':
+            noisefile=optarg;
             break;
         case 'f':
             filename=optarg;
@@ -59,11 +74,14 @@ int main(int argc ,char* argv[]){
             printf("Author:\tQian jiaqiang ,Fudan Univesity,15210700078@fudan.edu.cn\tHuangQiang Lab\n");
             printf("-s the particle size after dft and linear polar\n");
             printf("-n the number of particles\n");
+            printf("-N the file contains noise images\n");
             printf("-f the mrcs file which contains the particles data\n");
             printf("-p the start position of particles in mrcs file,default 1\n");
             //printf("-v the calculate method we used,default -1,needn't changed");
             printf("-i if you use -i,then we will try to throw out non-particles\n");
             printf("-l your output filename,which will contain the particles\n");
+            printf("example\n");
+            printf("cml_noise -s 144 -n 0 -N ~/data/noise.mrc -f ~/data/data.mrc -i -l ~/output/particles -o ~/output/log\n");
             exit(EXIT_SUCCESS);
             break;
         }
@@ -86,6 +104,10 @@ int main(int argc ,char* argv[]){
         printf("-o logfile is needed.\n");
         exit(EXIT_FAILURE);
     }
+    if (!noisefile){
+        printf("-N noise file is needed.\n");
+        exit(EXIT_FAILURE);
+    }
     FILE *OUTFILE;
     OUTFILE=fopen(logfile,"a+");
     fprintf(OUTFILE,"cml_size\t%d\n",cml_size);
@@ -100,11 +122,14 @@ int main(int argc ,char* argv[]){
     float sigma=180.0/float(T);
     FILE *f;
     FILE *outputfile;
+    FILE *fnoise;
     char mybuf[1024];
     char mybuf2[1024];
 
 //    f=fopen("/home/qjq/data/qjq_200_data","rb");
     f=fopen(filename,"rb");
+    fnoise=fopen(noisefile,"rb");
+
     outputfile=fopen(good_particle,"a+");
     setvbuf(outputfile,mybuf,_IOLBF,1024);
     setvbuf(OUTFILE,mybuf2,_IOLBF,1024);
@@ -112,7 +137,7 @@ int main(int argc ,char* argv[]){
     fseek(f,0,SEEK_END);
     filelength=ftell(f);
     if (START-1<0 or (START-1+N)*dft_size_pow>filelength){
-        printf("-p START can't G.T 0 or GREATER THAN filelength");
+        printf("-p START can't L.E 0 or GREATER THAN filelength");
         exit(EXIT_FAILURE);
     }
     rewind(f);
@@ -125,6 +150,15 @@ int main(int argc ,char* argv[]){
         exit(EXIT_FAILURE);
     }
 
+    long noisefilelength;
+    fseek(fnoise,0,SEEK_END);
+    noisefilelength=ftell(fnoise);
+    rewind(fnoise);
+    N_noise=noisefilelength/dft_size_pow/sizeof(float);
+    int List_Noise[N_noise];
+    for (i=0;i<N_noise;i++){
+        List_Noise[i]=i;
+    }
 
     int t_start,t_read_file,t_ncc_value,t_end,t_all_end,t_vote_1,t_vote_2,t_vote_3;
     struct timeval tsBegin,tsEnd;
@@ -136,7 +170,7 @@ int main(int argc ,char* argv[]){
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=1000;
+        iteration_size=500;
         int n_iteration;
 
         int last_iteration=N%iteration_size;
@@ -159,22 +193,29 @@ int main(int argc ,char* argv[]){
 
 
         int control=0;
-        for (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
+        for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
             int local_start=control_struct[control][0]*dft_size_pow;//文件中，这次control的粒子的起始位置
+            int double_local_N=2*local_N;
 //            int local_size_index=local_size*(local_size-1)/2;
-            int *cml_pair_matrix[local_N];
-                for (i=0;i<local_N;i++){
-                    cml_pair_matrix[i]= new int[local_N];
+            int *cml_pair_matrix[double_local_N];
+                for (i=0;i<double_local_N;i++){
+                    cml_pair_matrix[i]= new int[double_local_N];
                 }
                 //初始化数据集
-            long malloc_size=local_N*dft_size_pow;
+            long malloc_size=double_local_N*dft_size_pow;
             float *lineardft_matrix=new float[malloc_size];
             fseek(f,local_start*sizeof(float),SEEK_SET);
-            fread(lineardft_matrix,sizeof(float),malloc_size,f);
-
-
+            fread(lineardft_matrix,sizeof(float),local_N*dft_size_pow,f);
+            //读入Noise文件，将Noise文件乱序，取和local_N等量的噪音图像
+            std::random_shuffle(List_Noise,List_Noise+N_noise);
+            for (i=0;i<local_N;i++){
+                fseek(fnoise,List_Noise[i]*dft_size_pow*sizeof(float),SEEK_SET);
+                fread(&lineardft_matrix[local_N*dft_size_pow],sizeof(float),dft_size_pow,fnoise);
+            }
+            //维护混合数据List，记录粒子信息,(？不需要维护局部表）
+//            int maintain_list[double_local_N];
             //局部粒子矩阵，不需要做粒子数据偏移，但对粒子的序号在输出时要做偏移
             //计算cml_pair_matrix 旧方法,a cblas version
             if (version == 0){
@@ -214,27 +255,27 @@ int main(int argc ,char* argv[]){
             //the fastest cpu version
             if (version == -1){
             //cml_pair_matrix 新方法
-                float **total_nccq[local_N];
+                float **total_nccq[double_local_N];
             //    float ;
             //    total_nccq = new float** [N];
                 int postion;
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
                     total_nccq[i] = new float* [dft_size];
                 }
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
                     for (j=0;j<dft_size;j++){
                         total_nccq[i][j] = new float[4];
                     }
                 }
             //    printf("000005\n");
 //                gettimeofday(&tsBegin,NULL);
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
             //        #pragma omp parallel for,can't openmp here
                     for (j=0;j<dft_size;j++){
                         postion=i*dft_size_pow+j*dft_size;
             //            printf("000006\n");
 //                        total_nccq[i][j][0] = cblas_sasum( dft_size, &lineardft_matrix[postion], 1);//sum
-                        total_nccq[i][j][0] = CMLNCV::MYSUM(dft_size,&lineardft_matrix[postion]);
+                        total_nccq[i][j][0] = CMLNCV::MYSUM(dft_size,&lineardft_matrix[postion]);//sum
             //            printf("000007\n");
                         total_nccq[i][j][1] = total_nccq[i][j][0] / dft_size;//mean
             //            printf("000008\n");
@@ -244,9 +285,9 @@ int main(int argc ,char* argv[]){
                     }
                 }
 
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
                 #pragma omp parallel for
-                    for (j=0;j<local_N;j++){
+                    for (j=0;j<double_local_N;j++){
                         if (i==j){
                             cml_pair_matrix[i][j]=-1;
                         }
@@ -260,12 +301,12 @@ int main(int argc ,char* argv[]){
                     }
                 }
                 //NCC计算完成，所有common line被算出，释放计算辅助的数据存储矩阵
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
                     for (j=0;j<dft_size;j++){
                         delete[] total_nccq[i][j];
                         }
                     }
-                for (i=0;i<local_N;i++){
+                for (i=0;i<double_local_N;i++){
                         delete[] total_nccq[i];
                     }
 
@@ -273,8 +314,8 @@ int main(int argc ,char* argv[]){
 
             t_ncc_value=time(NULL);
 
-            float *hist_peak =  new float[local_N*(local_N-1)/2];
-            int *hist_index = new int[local_N*(local_N-1)/2];
+            float *hist_peak =  new float[double_local_N*(double_local_N-1)/2];
+            int *hist_index = new int[double_local_N*(double_local_N-1)/2];
             float half_pow_pi=sqrt(M_2_PI)*sigma;
             float four_sigma_pow=4*sigma*sigma;
 //            float alpha_t_alpha12;
@@ -320,14 +361,14 @@ int main(int argc ,char* argv[]){
 //                    }
 
 
-            for (i=0;i<local_N;i++){
-                for (j=i+1;j<local_N;j++){
-                    long int alpha_ij=((2*local_N-1-i)*i/2+j-(i+1));
+            for (i=0;i<double_local_N;i++){
+                for (j=i+1;j<double_local_N;j++){
+                    long int alpha_ij=((2*double_local_N-1-i)*i/2+j-(i+1));
                     if (cml_pair_matrix[i][j]!=-1){
-                        float tmp_voting[local_N];
+                        float tmp_voting[double_local_N];
                         float tmp_hist[T]={0.0};
 #pragma omp parallel for
-                        for (k=0;k<local_N;k++){
+                        for (k=0;k<double_local_N;k++){
                             if (k!=i and k!=j){
                                 if (cml_pair_matrix[i][k]!=-1 and cml_pair_matrix[j][k]!=-1){
                                     tmp_voting[k]=CMLNCV::cvoting(cml_pair_matrix[i][j],cml_pair_matrix[i][k],cml_pair_matrix[j][i],cml_pair_matrix[j][k],cml_pair_matrix[k][i],cml_pair_matrix[k][j],cons);
@@ -336,7 +377,7 @@ int main(int argc ,char* argv[]){
                             }
                             else {tmp_voting[k]=-10.0;}
                         }
-                        for (int m=0;m<local_N;m++){
+                        for (int m=0;m<double_local_N;m++){
                             float tmp=tmp_voting[m];
                             if (tmp!=-10.0){
 #pragma omp parallel for
@@ -356,9 +397,9 @@ int main(int argc ,char* argv[]){
             t_vote_1=time(NULL);
             if (hist_flag){
             fprintf(outputfile,"alpha_ij\ti\tj\thist_index\tpeak_value\n");
-            for (i=0;i<local_N;i++){
-                for (j=i+1;j<local_N;j++){
-                    int index=(2*local_N-1-i)*i/2+j-(i+1);
+            for (i=0;i<double_local_N;i++){
+                for (j=i+1;j<double_local_N;j++){
+                    int index=(2*double_local_N-1-i)*i/2+j-(i+1);
                     fprintf(outputfile,"alpha_ij\t%d\t%d\t%d\t%f\n",i,j,hist_index[index],hist_peak[index]);
                 }
             }
@@ -374,9 +415,9 @@ int main(int argc ,char* argv[]){
             int r=4;
 
             //复制一个hist_peak的备份;
-            float *hist_peak_cp =  new float[local_N*(local_N-1)/2];
-            long hist_peak_size=local_N*(local_N-1)/2;
-            int threshold_top=floor((1-(r/sqrt(local_N)))*hist_peak_size);
+            float *hist_peak_cp =  new float[double_local_N*(double_local_N-1)/2];
+            long hist_peak_size=double_local_N*(double_local_N-1)/2;
+            int threshold_top=floor((1-(r/sqrt(double_local_N)))*hist_peak_size);
             for (i=0;i<hist_peak_size;i++){
                 hist_peak_cp[i]=hist_peak[i];
             }
@@ -385,14 +426,14 @@ int main(int argc ,char* argv[]){
             float threshold=hist_peak_cp[threshold_top-1];
             delete[] hist_peak_cp;
             t_vote_2=time(NULL);
-            int Result_voted[local_N];
-            for (i=0;i<local_N;i++){
+            int Result_voted[double_local_N];
+            for (i=0;i<double_local_N;i++){
                 Result_voted[i]=0;
             }
             //找出Peak值较高的CML_pair
-            for (i=0;i<local_N;i++){
-                for (j=i+1;j<local_N;j++){
-                    int index = (2*local_N-1-i)*i/2+j-(i+1);
+            for (i=0;i<double_local_N;i++){
+                for (j=i+1;j<double_local_N;j++){
+                    int index = (2*double_local_N-1-i)*i/2+j-(i+1);
                     if (hist_peak[index]>threshold) {
 //                        NumOfHighPeak = NumOfHighPeak +1;
                         Result_voted[i]=Result_voted[i]+1;
@@ -400,28 +441,61 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
+            float mean_noise=0.0;
+            for (i=local_N;i<double_local_N;i++){
+                mean_noise+=Result_voted[i];
 
+            }
+            mean_noise=mean_noise/local_N;
+            fprintf(OUTFILE,"mean_noise\t%f\n",mean_noise);
+            //排序result_voted
+            std::vector<voted> V;
+            for (i=0;i<double_local_N;i++){
+                voted s;
+                s.index=i;
+                s.value=Result_voted[i];
+                V.push_back(s);
+            }
+            std::sort(V.begin(),V.end(),comp);
+            //输出排序值和结果,分两个，noise排位的平均值;随着排位上升，noise的比例
+            for (i=0;i<double_local_N;i++){
+                fprintf(outputfile,"%d\t%d\t%d\n",i,V[i].index,V[i].value);
+            }
+            int counter=0;
 
+            for (i=0;i<double_local_N;i++){
+                if (V[i].index>=local_N){
+                    counter=counter+1;
+                }
+                if ((i+1)%100==0){
+                    fprintf(OUTFILE,"%d\tcounter %d\trate\t%f\n",i,counter,counter/float(i+1));
+                }
+            }
 
+            //取出高可信粒子
+            /*
             const int step=sizeof(Result_voted)/sizeof(int);
             float threshold_voted=(*std::max_element(Result_voted,Result_voted+step))*0.2;
             fprintf(OUTFILE,"threshold_voted is %f\n",threshold_voted);
 //            float threshold_voting=*std::max_element(Result_voting,Reslut_voting+step)*0.8;
             //only voted particles are trusted.
             std::vector<int> local_good_particle;
-            for (i=0;i<local_N;i++){
+            for (i=0;i<double_local_N;i++){
                 if (Result_voted[i]>threshold_voted){
                     int good_voted_particle=control_struct[control][0]+i;
                     local_good_particle.push_back(good_voted_particle);
                 }
             }
-            t_end=time(NULL);
+
+
+
             if (local_good_particle.size()==0){
                 fprintf(outputfile,"the local_good_particle num is 0\n");
             }
             for (auto m:local_good_particle){
                 fprintf(outputfile,"%d\n",m);
             }
+            */
             //放入全局Global_good_particle中
 //            for (auto m:local_good_particle){
 //                Global_good_particle.push_back(m);
@@ -431,9 +505,10 @@ int main(int argc ,char* argv[]){
             delete[] lineardft_matrix;
             delete[] hist_index;
             delete[] hist_peak;
-            for (i=0;i<local_N;i++){
+            for (i=0;i<double_local_N;i++){
                 delete[] cml_pair_matrix[i];
             }
+            t_end=time(NULL);
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
             fprintf(OUTFILE,"voting time %d\n",t_end-t_ncc_value);
             fprintf(OUTFILE,"only voting time %d\n",t_vote_1-t_ncc_value);
