@@ -173,7 +173,7 @@ float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float 
          angleij=180.0;
         }
     }
-    else {angleij=-9.0;}
+    else {angleij=-10.0;}
     return angleij;
 }
 
@@ -370,7 +370,7 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
         }
     }
     //to deal with value_ini<0.7,the ncc_value shouldn't be too small
-    if (value_ini<0.7){
+    if (value_ini<0.5){
         ret.x=-1;
         ret.y=-1;
     }

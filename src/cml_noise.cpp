@@ -25,6 +25,7 @@ int main(int argc ,char* argv[]){
     int hist_flag=0;
     int iteration=0;
     int debug_flag=0;
+    int iteration_SIZE=0;
 //    int noise_flag=0;
     char* filename;
     char* good_particle;
@@ -32,7 +33,7 @@ int main(int argc ,char* argv[]){
     char* noisefile;
 //    char* directdiskfile;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:n:f:p:v:k:id:l:o:hN:")) != -1)
+    while((oc = getopt(argc, argv, "s:n:f:p:v:k:i:d:l:o:hN:")) != -1)
     {
         switch(oc)
         {
@@ -59,6 +60,7 @@ int main(int argc ,char* argv[]){
             break;
         case 'i':
             iteration=1;
+            iteration_SIZE=atoi(optarg);
             break;
         case 'd':
             debug_flag=1;
@@ -170,7 +172,7 @@ int main(int argc ,char* argv[]){
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=500;
+        iteration_size=iteration_SIZE;
         int n_iteration;
 
         int last_iteration=N%iteration_size;
@@ -212,8 +214,10 @@ int main(int argc ,char* argv[]){
             std::random_shuffle(List_Noise,List_Noise+N_noise);
             for (i=0;i<local_N;i++){
                 fseek(fnoise,List_Noise[i]*dft_size_pow*sizeof(float),SEEK_SET);
-                fread(&lineardft_matrix[local_N*dft_size_pow],sizeof(float),dft_size_pow,fnoise);
+                fread(&lineardft_matrix[(local_N+i)*dft_size_pow],sizeof(float),dft_size_pow,fnoise);
             }
+            fprintf(OUTFILE,"read finished\n");
+
             //维护混合数据List，记录粒子信息,(？不需要维护局部表）
 //            int maintain_list[double_local_N];
             //局部粒子矩阵，不需要做粒子数据偏移，但对粒子的序号在输出时要做偏移
@@ -311,7 +315,7 @@ int main(int argc ,char* argv[]){
                     }
 
             }
-
+            fprintf(OUTFILE,"ncc cal finished\n");
             t_ncc_value=time(NULL);
 
             float *hist_peak =  new float[double_local_N*(double_local_N-1)/2];
@@ -516,11 +520,13 @@ int main(int argc ,char* argv[]){
             fprintf(OUTFILE,"%d/%d\tcompleted\n",control,n_iteration);
 
         }
-        fclose(f);
-        fclose(outputfile);
+
 }
 
-
+        fclose(f);
+        fclose(outputfile);
+        fclose(fnoise);
+        fclose(OUTFILE);
 
 
 

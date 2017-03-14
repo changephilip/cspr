@@ -34,6 +34,8 @@ target_link_libraries(PickerCNN libmnistload libmrcparser libmrcprocess)
 
 add_executable(cml_trans cml_trans.cpp)
 target_link_libraries(cml_trans libcml libmrcprocess)
+add_executable(cml_real cml_real.cpp)
+target_link_libraries(cml_real libcml libmrcprocess)
 #add_library(cmlcl STATIC cml_cl.h cml_cl.cpp)
 #arget_link_libraries(cmlcl /usr/lib/libopenblas.a /usr/lib/x86_64-linux-gnu/libOpenCL.so /usr/lib/libclBLAS.so)
 

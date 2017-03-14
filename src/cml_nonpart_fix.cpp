@@ -441,11 +441,12 @@ int main(int argc ,char* argv[]){
             fprintf(OUTFILE,"%d/%d\tcompleted\n",control,n_iteration);
 
         }
-        fclose(f);
-        fclose(outputfile);
+
 }
 
-
+    fclose(f);
+    fclose(outputfile);
+    fclose(OUTFILE);
 
 
 
