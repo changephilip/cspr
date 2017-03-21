@@ -1,6 +1,6 @@
-#include "cml_nocv.h"
+#include "cml_cuda.h"
 
-namespace CMLNCV{
+namespace CMLCU{
 
 
 float NCC0(float *cml1,float *cml2,int CML_SIZE){
@@ -348,7 +348,6 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
 //    printf("%f",Qci[0][1]);
 
     //mpi here
-    /*
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
 //#pragma omp parallel for
@@ -359,33 +358,14 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
         }
 
     }
-    */
-
-
-    float C[after_dft_size*after_dft_size];
-    cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,after_dft_size,after_dft_size,after_dft_size,1,Ci,after_dft_size,Cj,after_dft_size,0,C,after_dft_size);
-    for (i=0;i<after_dft_size;i++){
-//#pragma omp parallel for
-        for (j=0;j<after_dft_size;j++){
-            value[i][j]=(C[i*after_dft_size+j]+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
-        }
-    }
-
-//    float sum=0.0;
     for(i=0;i<after_dft_size;i++){
         for(j=0;j<after_dft_size;j++){
 //            printf("\t%f\t",value[i][j]);
-//            sum+=pow((C[i*after_dft_size+j]-value[i][j]),2);
             if (value[i][j]>value_ini) {
                 value_ini = value[i][j];
                 ret.x=i;
                 ret.y=j;
             }
-//            if (C[i*after_dft_size+j]>value_ini){
-//                value_ini = C[i*after_dft_size+j];
-//                ret.x=i;
-//                ret.y=j;
-//            }
 //            else break;
         }
     }
@@ -394,7 +374,6 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
         ret.x=-1;
         ret.y=-1;
     }
-//    printf("%f\n",sum);
 //    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
     return ret;
 }
@@ -496,8 +475,10 @@ int max_float_index(float *infloat,int size_of_array){
     return max_index_return;
 }
 
+void NCC_cuda()
+void voting_cuda()
+void VCL_cuda(float *indata,int N,int cml_size,int *order)
 
 
 
 }
-

@@ -205,6 +205,10 @@ int main(int argc ,char* argv[]){
                 for (i=0;i<double_local_N;i++){
                     cml_pair_matrix[i]= new int[double_local_N];
                 }
+            float *cml_pair_matrix_help[double_local_N];
+                for (i=0;i<double_local_N;i++){
+                    cml_pair_matrix_help[i] = new float [double_local_N];
+                }
                 //初始化数据集
             long malloc_size=double_local_N*dft_size_pow;
             float *lineardft_matrix=new float[malloc_size];
@@ -290,8 +294,9 @@ int main(int argc ,char* argv[]){
                 }
 
                 for (i=0;i<double_local_N;i++){
-                #pragma omp parallel for
-                    for (j=0;j<double_local_N;j++){
+//                #pragma omp parallel for
+                    for (j=i+1;j<double_local_N;j++){
+//                    for (j=i+1;j<double_local_N;j++){
                         if (i==j){
                             cml_pair_matrix[i][j]=-1;
                         }
@@ -304,6 +309,25 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
+                //test
+                /*
+                for (i=0;i<double_local_N;i++){
+//                #pragma omp parallel for
+                    for (j=0;j<double_local_N;j++){
+//                    for (j=i+1;j<double_local_N;j++){
+                        if (i==j){
+                            cml_pair_matrix[i][j]=-1;
+                        }
+                        else {
+                            cmlncv_tuple tmp;
+            //                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                            tmp=CMLNCV::NCC_QT(total_nccq[i],total_nccq[j],&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                            if (cml_pair_matrix[i][j]!=tmp.x) printf("error\n");
+                            if (cml_pair_matrix[j][i]!=tmp.y) printf("error\n");
+                        }
+                    }
+                }
+                */
                 //NCC计算完成，所有common line被算出，释放计算辅助的数据存储矩阵
                 for (i=0;i<double_local_N;i++){
                     for (j=0;j<dft_size;j++){
@@ -511,6 +535,7 @@ int main(int argc ,char* argv[]){
             delete[] hist_peak;
             for (i=0;i<double_local_N;i++){
                 delete[] cml_pair_matrix[i];
+                delete[] cml_pair_matrix_help[i];
             }
             t_end=time(NULL);
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
