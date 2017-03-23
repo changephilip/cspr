@@ -14,11 +14,17 @@
 #include <cblas.h>
 #include <algorithm>
 #include <cuda_runtime.h>
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
 using namespace std;
 typedef struct{
     int x;
     int y;
 }cmlncv_tuple;
+typedef struct{
+    int x;
+    int y;
+    float value;
+}cml_retstruc;
 namespace CMLNCV
 {
     void readDFTData(FILE *f,float *p,float CML_SIZE,int numOfItem);

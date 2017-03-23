@@ -348,6 +348,8 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
 //    printf("%f",Qci[0][1]);
 
     //mpi here
+    //old code
+    /*
     for(i=0;i<after_dft_size;i++){
 //        printf("\n000001");
 //#pragma omp parallel for
@@ -356,6 +358,38 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
             value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
 //            printf("%f",value[i][j]);
         }
+
+    }
+    */
+    //new code,complete it with sgemm
+    float C1[after_dft_size*after_dft_size];
+    float C[after_dft_size*after_dft_size];
+    cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,after_dft_size,after_dft_size,after_dft_size,1,Ci,after_dft_size,Cj,after_dft_size,0,C1,after_dft_size);
+
+    for (i=0;i<after_dft_size;i++){
+//#pragma omp parallel for
+        for (j=0;j<after_dft_size;j++){
+            value[i][j]=(C[i*after_dft_size+j]+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
+        }
+    }
+
+    //simple test cublassgemm,if it work more quickly?
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    float *d_a,*d_b,*d_c;
+    checkCudaErrors(cudaMalloc((void**)&d_a,after_dft_size*after_dft_size*sizeof(float)));
+    checkCudaErrors(cudaMalloc((void**)&d_b,after_dft_size*after_dft_size*sizeof(float)));
+    checkCudaErrors(cudaMalloc((void**)&d_c,after_dft_size*after_dft_size*sizeof(float)));
+    checkCudaErrors(cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Ci,1,d_a,1));
+    checkCudaErrors(cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Cj,1,d_a,1));
+    cudaThreadSynchronize();
+    checkCudaErrors(cublasSgemm(handle,CUBLAS_OP_N,CUBLAS_OP_N,after_dft_size,after_dft_size,after_dft_size,1,d_b,after_dft_size,d_a,after_dft_size,0,d_c,after_dft_size));
+    checkCudaErrors(cudaMemcpy(C,d_c,after_dft_size*after_dft_size*sizeof(float),cudaMemcpyDeviceToHost));
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+    cublasDestroy(handle);
+    for(i=0;i<after_dft_size*after_dft_size;i++){
 
     }
     for(i=0;i<after_dft_size;i++){
@@ -475,9 +509,128 @@ int max_float_index(float *infloat,int size_of_array){
     return max_index_return;
 }
 
-void NCC_cuda()
-void voting_cuda()
-void VCL_cuda(float *indata,int N,int cml_size,int *order)
+void flambda(){
+    //简单kernel
+
+}
+
+//来源于网络
+__global__ void Max_Reduce(int *d_array, int array_len, int *max_value, int *max_idx)
+            {
+                           __share__ int temp_value_share[warp_size];
+                           __share__ int temp_idx_share[warp_size];
+                          int tid=thread.x+blockDim.x*blockIdx.x;
+                          int i,temp_value,temp_value1,temp_idx,temp_idx1;
+                          int warpid=thread.x/warp_size,laneid=thread.x%warp_size;
+                            temp_value=-1e30;
+                           temp_idx=thread.x;
+                          if(tid<n)
+                          {
+                                    temp_value=d_array[tid];
+                           }
+                                 for(i=warp_size/2;i>=1;i/=2)
+                                 {
+                                         temp_value1=shft_xor(temp_value,i,warp_size);
+                                         temp_idx1=shft_xor(temp_idx,i,warp_size);
+                                        if(temp_value<temp_value1)
+                                        {
+                                                temp_value=temp_value1;
+                                                temp_idx=temp_idx1;
+                                         }
+                                       else if(temp_value=temp_value1)
+                                       {
+                                                 if(temp_idx>temp_idx1)
+                                                {
+                                                         temp_idx=temp_idx1;
+                                                }
+                                        }
+                                  }
+                               if(!laneid)
+                               {
+                                      temp_value_share[warpid]=temp_value;
+                                      temp_idx_share[warpid]=temp_idx;
+                              }
+                            __sychthreads();
+                           if(thread.x<warp_size)
+                          {
+                                   temp_value=temp_value_share[thread.x];
+                                   temp_idx=temp_idx_share[thread.x];
+                                  for(i=warp_size/2;i>=1;i/=2)
+                                 {
+                                         temp_value1=shft_xor(temp_value,i,warp_size);
+                                         temp_idx1=shft_xor(temp_idx,i,warp_size);
+                                        if(temp_value<temp_value1)
+                                        {
+                                                temp_value=temp_value1;
+                                                temp_idx=temp_idx1;
+                                         }
+                                         else if(temp_value=temp_value1)
+                                       {
+                                                 if(temp_idx>temp_idx1)
+                                                {
+                                                         temp_idx=temp_idx1;
+                                                }
+                                        }
+                                  }
+                           }
+                             if(!thread.x)
+                            {
+                                    max_value[blockIdx.x]=temp_value;
+                                    max_idx[block.x]=temp_idx;
+                             }
+             }
+
+void parent_ncc_kernel(float *C1 ,float *C2,int N,int L,cml_retstruc *S,){
+     //获取局部id
+     //设置cublas环境，启动cublas_sgemm
+     //设置局部变量C3,接受sgemmm的结果，估计为160K
+    cublasHandle_t handle;
+    cublasStatus_t status;
+    local float C3[L*L];
+    //cudaMalloc((void**)&C3,L*L*sizeof(float));
+     cublas_sgemm(handle,);
+     //flambda接受C3和辅助矩阵参数计算
+     //分配flambda网格，让C3就地接受结果
+     flambda();
+     //C3作为参数，获得最大返回值参数，获得alpha_ij编号，并获得L中的序号。
+     Max_reduce();
+}
+
+void wrapper_kernel(float *data,int N,int cml_size){
+    //wrapper_kernel前应该完成，数据打包成一个长数组
+    //设置控制矩阵
+    //读取数据接口，数值矩阵，，返回值矩阵，设置cuda环境，启动kernel
+    //返回值矩阵，包括cml_matrix的value和坐标
+    int control_size=N*(N-1)/2;
+    int i,j;
+
+    int BLOCK_SIZE;//理论上没有上限
+    int THREAD_PER_BLOCK;//(<512,根据显卡设备的cuda参数定)
+    //配置控制矩阵，alpha_ij序数控制
+    ctr= new float [control_size];
+    ctr_id1 = new float [control_size];
+    ctr_id2 = new float [control_size];
+    for (i=0;i<control_size;i++){
+        ctr[i]=i;
+    }
+    for (i=0;i<control_size;i++){
+        for (j=i+1;j<control_size;j++){
+            ctr_id1 = i;
+            ctr_id2 = j;
+        }
+    }
+    //flambda需要的辅助矩阵，设置为线性格式
+
+    //分配cuda内存，把数据矩阵、辅助矩阵存入
+
+    //返回值矩阵，线性，分配内存
+
+    //设置网格、线程参数，启动parent_ncc_kernel
+
+
+
+}
+
 
 
 
