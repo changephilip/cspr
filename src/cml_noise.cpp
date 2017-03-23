@@ -1,4 +1,5 @@
-#include "cml_nocv.h"
+//#include "cml_nocv.h"
+#include "cml_cuda.h"
 #include <time.h>
 #include <sys/time.h>
 //#include <array>>

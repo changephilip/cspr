@@ -1,6 +1,6 @@
 #include "cml_cuda.h"
 
-namespace CMLCU{
+namespace CMLNCV{
 
 
 float NCC0(float *cml1,float *cml2,int CML_SIZE){
@@ -362,21 +362,22 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
     }
     */
     //new code,complete it with sgemm
-    float C1[after_dft_size*after_dft_size];
+    //float C1[after_dft_size*after_dft_size];
     float C[after_dft_size*after_dft_size];
-    cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,after_dft_size,after_dft_size,after_dft_size,1,Ci,after_dft_size,Cj,after_dft_size,0,C1,after_dft_size);
-
+    //cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,after_dft_size,after_dft_size,after_dft_size,1,Ci,after_dft_size,Cj,after_dft_size,0,C1,after_dft_size);
+	/*
     for (i=0;i<after_dft_size;i++){
 //#pragma omp parallel for
         for (j=0;j<after_dft_size;j++){
             value[i][j]=(C[i*after_dft_size+j]+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
         }
     }
-
+*/
     //simple test cublassgemm,if it work more quickly?
     cublasHandle_t handle;
     cublasCreate(&handle);
     float *d_a,*d_b,*d_c;
+/*
     checkCudaErrors(cudaMalloc((void**)&d_a,after_dft_size*after_dft_size*sizeof(float)));
     checkCudaErrors(cudaMalloc((void**)&d_b,after_dft_size*after_dft_size*sizeof(float)));
     checkCudaErrors(cudaMalloc((void**)&d_c,after_dft_size*after_dft_size*sizeof(float)));
@@ -384,14 +385,37 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
     checkCudaErrors(cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Cj,1,d_a,1));
     cudaThreadSynchronize();
     checkCudaErrors(cublasSgemm(handle,CUBLAS_OP_N,CUBLAS_OP_N,after_dft_size,after_dft_size,after_dft_size,1,d_b,after_dft_size,d_a,after_dft_size,0,d_c,after_dft_size));
-    checkCudaErrors(cudaMemcpy(C,d_c,after_dft_size*after_dft_size*sizeof(float),cudaMemcpyDeviceToHost));
+*/
+    float alpha=1.0;
+    float beta=0.0;
+    cudaMemcpy(C,d_c,after_dft_size*after_dft_size*sizeof(float),cudaMemcpyDeviceToHost);
+    cudaMalloc((void**)&d_a,after_dft_size*after_dft_size*sizeof(float));
+    cudaMalloc((void**)&d_b,after_dft_size*after_dft_size*sizeof(float));
+    cudaMalloc((void**)&d_c,after_dft_size*after_dft_size*sizeof(float));
+    cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Ci,1,d_a,1);
+    cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Cj,1,d_b,1);
+    cudaThreadSynchronize();
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,after_dft_size,after_dft_size,after_dft_size,&alpha,d_b,after_dft_size,d_a,after_dft_size,&beta,d_c,after_dft_size);
+    cudaMemcpy(C,d_c,after_dft_size*after_dft_size*sizeof(float),cudaMemcpyDeviceToHost);
+
     cudaFree(d_a);
     cudaFree(d_b);
     cudaFree(d_c);
     cublasDestroy(handle);
-    for(i=0;i<after_dft_size*after_dft_size;i++){
-
+	for (i=0;i<after_dft_size;i++){
+//#pragma omp parallel for
+        for (j=0;j<after_dft_size;j++){
+            value[i][j]=(C[i*after_dft_size+j]+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
+        }
     }
+
+/* 
+    float sum=0.0;
+    for(i=0;i<after_dft_size*after_dft_size;i++){
+	sum+=(C1[i]-C[i])*(C1[i]-C[i]);
+    }
+    sum=sqrt(sum/after_dft_size/after_dft_size);
+    printf("diff betwenn cublas and blas\t %f\n",sum);*/
     for(i=0;i<after_dft_size;i++){
         for(j=0;j<after_dft_size;j++){
 //            printf("\t%f\t",value[i][j]);
@@ -508,7 +532,7 @@ int max_float_index(float *infloat,int size_of_array){
     }
     return max_index_return;
 }
-
+/*
 void flambda(){
     //简单kernel
 
@@ -630,7 +654,7 @@ void wrapper_kernel(float *data,int N,int cml_size){
 
 
 }
-
+*/
 
 
 

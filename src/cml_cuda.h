@@ -14,6 +14,8 @@
 #include <cblas.h>
 #include <algorithm>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
+//#include <helper_cuda.h>
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
 using namespace std;
 typedef struct{
