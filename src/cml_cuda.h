@@ -40,6 +40,7 @@ namespace CMLNCV
     cmlncv_tuple NCC_Q(float *Ci,float *Cj,int after_dft_size);
     cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size);
     cmlncv_tuple NCC_value0(float *Ci,float *Cj,int after_dft_size);
+    cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size);
     float max_float(float *infloat,int size_of_array);
     int max_float_index(float *infloat,int size_of_array);
     float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons2);

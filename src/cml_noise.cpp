@@ -304,7 +304,7 @@ int main(int argc ,char* argv[]){
                         else {
                             cmlncv_tuple tmp;
             //                tmp=CMLNCV::NCC_value(&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
-                            tmp=CMLNCV::NCC_QT(total_nccq[i],total_nccq[j],&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
+                            tmp=CMLNCV::NCC_QT_check(total_nccq[i],total_nccq[j],&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
                             cml_pair_matrix[i][j]=tmp.x;
                             cml_pair_matrix[j][i]=tmp.y;
                         }
