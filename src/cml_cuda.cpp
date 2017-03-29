@@ -870,6 +870,16 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     dim3 dimGrid(control_size/500,1,1);
     dim3 dimBlock(500,1,1);
     Kernel parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,L,d_S);
+    cudaMemcpy(S,d_S,sizeof(cml_retstruc)*control_size,cudaMemcpyDeviceToHost);
+
+    cudaFree(d_data);
+    cudaFree(d_sum);
+    cudaFree(d_mean);
+    cudaFree(d_stdv);
+    cudaFree(d_ctr);
+    cudaFree(d_ctr_id1);
+    cudaFree(d_ctr_id2);
+    cudaFree(d_S);
     //使用一个简单的kernel,不使用child kernel调用。
     //flambda需要的辅助矩阵，设置为线性格式
 
