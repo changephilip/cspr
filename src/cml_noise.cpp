@@ -1,5 +1,6 @@
 //#include "cml_nocv.h"
 #include "cml_cuda.h"
+#include "cml_cuda.cu"
 #include <time.h>
 #include <sys/time.h>
 //#include <array>>
@@ -294,6 +295,8 @@ int main(int argc ,char* argv[]){
                     }
                 }
 
+
+//calculate ncc with cpu
                 for (i=0;i<double_local_N;i++){
 //                #pragma omp parallel for
                     for (j=i+1;j<double_local_N;j++){
@@ -310,6 +313,34 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
+//calculate ncc with gpu
+                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
+                wrapper_kernel(lineardft_matrix,double_local_N,dft_size,toal_nccq,S);
+                for (i=0;i<double_local_N;i++){
+                    for (j=i+1;j<double_local_N;j++){
+                        if (S[(2*double_local_N-1-i)*i/2+j-(i+1)].value>0.5){
+                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
+                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
+                        }
+                    }
+                    else{
+                        cml_pair_matrix_help[i][j]=-1;
+                        cml_pair_matrix_help[j][i]=-1;
+                    }
+                }
+                for (i=0;i<double_local_N;i++){
+                    cml_pair_matrix[i][i]=-1;
+                    cml_pair_matrix_help[i][i]=-1;
+                }
+                //test GPU with cpu
+                float diff=0.0f;
+                for (i=0;i<double_local_N;i++){
+                    for (j=0;j<double_local_N;j++){
+                        diff+=(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j])*(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j]);
+                    }
+                }
+                diff=sqrt(diff/double_local_N/double_local_N);
+                printf("diff between gpu_ncc with cpu_ncc\t%f\n",diff);
                 //test
                 /*
                 for (i=0;i<double_local_N;i++){
