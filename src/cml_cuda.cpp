@@ -397,6 +397,7 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
     return ret;
 }
 
+/*
 
 cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size){
 //  Ci,Cj,two-dem matrix
@@ -408,41 +409,6 @@ cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_
 //    float Qci[after_dft_size][4];
 //    float Qcj[after_dft_size][4];
 
-/*
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qci[i][0] = cblas_sasum( after_dft_size, &Ci[i*after_dft_size], 1);//sum
-        Qci[i][1] = Qci[i][0] / after_dft_size;//mean
-        Qci[i][2] = cblas_sdot( after_dft_size, &Ci[i*after_dft_size], 1,&Ci[i*after_dft_size],1);//dot
-        Qci[i][3] = sqrt((Qci[i][2] + after_dft_size*Qci[i][0]*Qci[i][0] - 2*Qci[i][0]*Qci[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-#pragma omp parallel for
-    for (i=0;i<after_dft_size;i++){
-        Qcj[i][0] = cblas_sasum( after_dft_size, &Cj[i*after_dft_size], 1);//sum
-        Qcj[i][1] = Qcj[i][0] / after_dft_size;//mean
-        Qcj[i][2] = cblas_sdot( after_dft_size, &Cj[i*after_dft_size],1, &Cj[i*after_dft_size],1);//dot
-        Qcj[i][3] = sqrt((Qci[i][2] + after_dft_size*Qcj[i][0]*Qcj[i][0] - 2*Qcj[i][0]*Qcj[i][1])/after_dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
-    }
-*/
-//    printf("see Qci\n");
-//    printf("%f",Qci[0][1]);
-
-    //mpi here
-    //old code
-    /*
-    for(i=0;i<after_dft_size;i++){
-//        printf("\n000001");
-//#pragma omp parallel for
-        for(j=0;j<after_dft_size;j++){
-            //    ncc=coeff*(ncc_fft+N*mean1*mean2-mean1*SUM(b)-mean2*SUM(a));
-            value[i][j] = (cblas_sdot(after_dft_size,&Ci[i*after_dft_size],1, &Cj[j*after_dft_size],1 )+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
-//            printf("%f",value[i][j]);
-        }
-
-    }
-    */
-    //new code,complete it with sgemm
-    //float C1[after_dft_size*after_dft_size];
     float C[after_dft_size*after_dft_size];
     float C_trd[after_dft_size*after_dft_size];
     float C_cpublas[after_dft_size*after_dft_size];
@@ -454,27 +420,11 @@ cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_
     }
 
 
-    /*
-    for (i=0;i<after_dft_size;i++){
-//#pragma omp parallel for
-        for (j=0;j<after_dft_size;j++){
-            value[i][j]=(C[i*after_dft_size+j]+after_dft_size*Qci[i][1]*Qcj[j][1]-Qci[i][1]*Qcj[j][0]-Qci[i][0]*Qcj[j][1])/(after_dft_size*Qci[i][3]*Qcj[j][3]);
-        }
-    }
-*/
-    //simple test cublassgemm,if it work more quickly?
+        //simple test cublassgemm,if it work more quickly?
     cublasHandle_t handle;
     cublasCreate(&handle);
     float *d_a,*d_b,*d_c;
-/*
-    checkCudaErrors(cudaMalloc((void**)&d_a,after_dft_size*after_dft_size*sizeof(float)));
-    checkCudaErrors(cudaMalloc((void**)&d_b,after_dft_size*after_dft_size*sizeof(float)));
-    checkCudaErrors(cudaMalloc((void**)&d_c,after_dft_size*after_dft_size*sizeof(float)));
-    checkCudaErrors(cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Ci,1,d_a,1));
-    checkCudaErrors(cublasSetVector(after_dft_size*after_dft_size,sizeof(float),Cj,1,d_a,1));
-    cudaThreadSynchronize();
-    checkCudaErrors(cublasSgemm(handle,CUBLAS_OP_N,CUBLAS_OP_N,after_dft_size,after_dft_size,after_dft_size,1,d_b,after_dft_size,d_a,after_dft_size,0,d_c,after_dft_size));
-*/
+
     float alpha=1.0;
     float beta=0.0;
     cudaMemcpy(C,d_c,after_dft_size*after_dft_size*sizeof(float),cudaMemcpyDeviceToHost);
@@ -524,13 +474,6 @@ cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_
         }
     }
 
-/*
-    float sum=0.0;
-    for(i=0;i<after_dft_size*after_dft_size;i++){
-    sum+=(C1[i]-C[i])*(C1[i]-C[i]);
-    }
-    sum=sqrt(sum/after_dft_size/after_dft_size);
-    printf("diff betwenn cublas and blas\t %f\n",sum);*/
     for(i=0;i<after_dft_size;i++){
         for(j=0;j<after_dft_size;j++){
 //            printf("\t%f\t",value[i][j]);
@@ -550,6 +493,8 @@ cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_
 //    printf("\n%d\t%d\t%f\n",ret.x,ret.y,value_ini);
     return ret;
 }
+
+*/
 
 cmlncv_tuple NCC_valuet(float *Ci,float *Cj,int after_dft_size){
 //  Ci,Cj,two-dem matrix

@@ -13,8 +13,8 @@
 #include <math.h>
 #include <cblas.h>
 #include <algorithm>
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
+//#include <cuda_runtime.h>
+//#include <cublas_v2.h>
 //#include <helper_cuda.h>
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
 using namespace std;
@@ -22,11 +22,6 @@ typedef struct{
     int x;
     int y;
 }cmlncv_tuple;
-typedef struct{
-    int x;
-    int y;
-    float value;
-}cml_retstruc;
 namespace CMLNCV
 {
     void readDFTData(FILE *f,float *p,float CML_SIZE,int numOfItem);
@@ -40,7 +35,7 @@ namespace CMLNCV
     cmlncv_tuple NCC_Q(float *Ci,float *Cj,int after_dft_size);
     cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size);
     cmlncv_tuple NCC_value0(float *Ci,float *Cj,int after_dft_size);
-    cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size);
+    //cmlncv_tuple NCC_QT_check(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_size);
     float max_float(float *infloat,int size_of_array);
     int max_float_index(float *infloat,int size_of_array);
     float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons2);
