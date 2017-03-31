@@ -1,5 +1,6 @@
 #ifndef CML_CUDA_H
 #define CML_CUDA_H
+#include <malloc.h>
 #include <iostream>
 #include <fstream>
 #include <string>
