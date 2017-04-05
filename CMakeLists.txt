@@ -4,4 +4,5 @@ add_subdirectory(src)
 #add_subdirectory(build)
 #SET(cmake-spr_SOURCE_DIR src)
 #SET(cmake-spr_BINARY_DIR build)
+#nvcc -arch=sm_35 -O2 -rdc=true -lcublas -lcublas_device -lcudadevrt -lcblas -o dcuda cml_dcuda.cu
 

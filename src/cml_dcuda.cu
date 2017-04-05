@@ -99,7 +99,8 @@ cmlncv_tuple NCC_value(float *Ci,float *Cj,int after_dft_size){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
-            value[i][j] = BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+    //        value[i][j] = BNCC(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+		value[i][j]=1.0f;
 //            printf("\n000003");
         }
 
@@ -136,7 +137,8 @@ cmlncv_tuple NCC_value0(float *Ci,float *Cj,int after_dft_size){
 //            p1 = Ci[i*after_dft_size];
 //            p2 = Cj[j*after_dft_size];
 //            printf("\n0000002");
-            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+//            value[i][j] = NCC0(&Ci[i*after_dft_size],&Cj[j*after_dft_size],after_dft_size);
+		value[i][j]=1.0f;
 //            printf("\n000003");
         }
 
@@ -320,8 +322,8 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d
      //设置局部变量C3,接受sgemmm的结果，估计为160K,调用子内核时，不能使用local memory,必须把C3分配在global memory
      //调整方案，不使用子内核调用，直接部署代码
     int globalThreadID=threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z);
-    int imagea=d_ctr_id1[globalThreadID];
-    int imageb=d_ctr_id2[globalThreadID];
+    int image_a=d_ctr_id1[globalThreadID];
+    int image_b=d_ctr_id2[globalThreadID];
 //    int L_power=L*L;
     int i,j;
     cublasHandle_t handle;
@@ -330,7 +332,7 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d
     float beta=0.0;
     float C3[L_power];
     //cudaMalloc((void**)&C3,L*L*sizeof(float));
-    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,N,N,N,&alpha,&d_data[L_power*imageb],N,&d_data[L_power*imagea],N,&beta,C3,N);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*image_b],L,&d_data[L_power*image_a],L,&beta,C3,L);
     cublasDestroy(handle);
 
 
@@ -340,7 +342,7 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d
         for (j=0;j<L;j++){
             //image_2*L+j
 //            C[i*L+j]=(C[i*L+j]+L*help[image_1*3].y*help[image_2*3].y-xy-yx)/(N*z*z);
-            C3[i*L+j]=(C3[i*L+j]+L*d_mean[imagea*L+i]*d_mean[imageb*L+j]-d_sum[imagea*L+i]*d_mean[imageb*L+j]-d_mean[imagea*L+i]*d_sum[imageb*L+j])/(N*d_stdv[imagea*L+i]*d_stdv[imageb*L+j]);
+            C3[i*L+j]=(C3[i*L+j]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(N*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
         }
     }
 
@@ -372,7 +374,8 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     //返回值矩阵，包括cml_matrix的value和坐标
     int control_size=N*(N-1)/2;
     int i,j;
-
+    //printf("377\n");
+    //printf("N\t%d\n",N);
 //    int BLOCK_SIZE;//理论上没有上限
  //   int THREAD_PER_BLOCK;//(<512,根据显卡设备的cuda参数定)
     //配置控制矩阵，alpha_ij序数控制,ctr为alphaij序数
@@ -383,14 +386,15 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     ctr= new int [control_size];
     ctr_id1 = new int [control_size];
     ctr_id2 = new int [control_size];
+    printf("389\n");
     for (i=0;i<control_size;i++){
         ctr[i]=i;
     }
     for (i=0;i<N;i++){
         for (j=i+1;j<N;j++){
 //an error here ,the id is not eq i;should be modified later.((2*local_N-1-i)*i/2+j-(i+1))
-            ctr_id1[((2*N-1-i)*i/2+j)] = i;
-            ctr_id2[((2*N-1-i)*i/2+j)] = j;
+            ctr_id1[((2*N-1-i)*i/2+j-i-1)] = i;
+            ctr_id2[((2*N-1-i)*i/2+j-i-1)] = j;
         }
     }
     //配置辅助矩阵help.拆分成三个数组，每个数组为N×L
@@ -407,6 +411,7 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
             stdv[i*L+j]=help[i][j][3];
         }
     }
+    //printf("412\n");
     int *d_ctr;
     int *d_ctr_id1;
     int *d_ctr_id2;
@@ -415,6 +420,7 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     float *d_mean;
     float *d_stdv;
     cml_retstruc *d_S;
+    //printf("421\n");
     cudaMalloc((void **) &d_sum,sizeof(float)*N*L);
     cudaMalloc((void **) &d_mean,sizeof(float)*N*L);
     cudaMalloc((void **) &d_stdv,sizeof(float)*N*L);
@@ -432,10 +438,11 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     cudaMemcpy(d_ctr_id1,ctr_id1,control_size*sizeof(int),cudaMemcpyHostToDevice);
     cudaMemcpy(d_ctr_id2,ctr_id2,control_size*sizeof(int),cudaMemcpyHostToDevice);
     cudaMemcpy(d_data,data,N*L*L*sizeof(float),cudaMemcpyHostToDevice);
-
-    dim3 dimGrid(control_size/500,1,1);
-    dim3 dimBlock(500,1,1);
+//	printf("439\n");
+    dim3 dimGrid(control_size/100,1,1);
+    dim3 dimBlock(100,1,1);
     parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,d_S);
+    cudaDeviceSynchronize(); 
     cudaMemcpy(S,d_S,sizeof(cml_retstruc)*control_size,cudaMemcpyDeviceToHost);
 
     cudaFree(d_data);
@@ -697,6 +704,7 @@ int main(int argc ,char* argv[]){
                     }
                 }
             }
+//	    printf("702\n");
             //using a faster version
             if (version == 1){
                 for (i=0;i<local_N;i++){
@@ -714,6 +722,7 @@ int main(int argc ,char* argv[]){
                     }
                 }
             }
+//		printf("703\n");
             t_start=time(NULL);
             //the fastest cpu version
             if (version == -1){
@@ -769,6 +778,7 @@ int main(int argc ,char* argv[]){
 //calculate ncc with gpu
         cml_retstruc *S;
                 S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
+		printf("before enter wrappper\n");
                 wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,S);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
