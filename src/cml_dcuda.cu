@@ -316,7 +316,7 @@ int max_float_index(float *infloat,int size_of_array){
     return max_index_return;
 }
 
-__global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d_ctr_id2,float *d_sum,float *d_mean,float *d_stdv,int N,cml_retstruc *S){
+__global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d_ctr_id2,float *d_sum,float *d_mean,float *d_stdv,int N,int *Sx,int *Sy,float *Svalue){
      //获取局部id
      //设置cublas环境，启动cublas_sgemm
      //设置局部变量C3,接受sgemmm的结果，估计为160K,调用子内核时，不能使用local memory,必须把C3分配在global memory
@@ -361,13 +361,13 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d
             }
         }
     }
-    S[globalThreadID].value=max_value;
-    S[globalThreadID].x=max_index_i;
-    S[globalThreadID].y=max_index_j;
+    Svalue[globalThreadID]=max_value;
+    Sx[globalThreadID]=max_index_i;
+    Sy[globalThreadID]=max_index_j;
 
 }
 
-void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S){
+void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
     //wrapper_kernel前应该完成，数据打包成一个长数组
     //设置控制矩阵
     //读取数据接口，数值矩阵，，返回值矩阵，设置cuda环境，启动kernel
@@ -419,7 +419,10 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     float *d_sum;
     float *d_mean;
     float *d_stdv;
-    cml_retstruc *d_S;
+//    cml_retstruc *d_S;
+    int *d_Sx;
+    int *d_Sy;
+    float *d_Svalue;
     //printf("421\n");
     cudaMalloc((void **) &d_sum,sizeof(float)*N*L);
     cudaMalloc((void **) &d_mean,sizeof(float)*N*L);
@@ -429,7 +432,10 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     cudaMalloc((void **) &d_ctr_id1,sizeof(int)*control_size);
     cudaMalloc((void **) &d_ctr_id2,sizeof(int)*control_size);
 
-    cudaMalloc((void **) &d_S,sizeof(cml_retstruc)*control_size);
+//    cudaMalloc((void **) &d_S,sizeof(cml_retstruc)*control_size);
+    cudaMalloc((void **) &d_Sx,sizeof(int)*control_size);
+    cudaMalloc((void **) &d_Sy,sizeof(int)*control_size);
+    cudaMalloc((void **) &d_Svalue,sizeof(float)*control_size);
 
     cudaMemcpy(d_sum,sum,N*L*sizeof(float),cudaMemcpyHostToDevice);
     cudaMemcpy(d_mean,mean,N*L*sizeof(float),cudaMemcpyHostToDevice);
@@ -441,9 +447,12 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
 //	printf("439\n");
     dim3 dimGrid(control_size/100,1,1);
     dim3 dimBlock(100,1,1);
-    parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,d_S);
+    parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,d_Sx,d_Sy,d_Svalue);
     cudaDeviceSynchronize(); 
-    cudaMemcpy(S,d_S,sizeof(cml_retstruc)*control_size,cudaMemcpyDeviceToHost);
+//    cudaMemcpy(S,d_S,sizeof(cml_retstruc)*control_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Sx,d_Sx,sizeof(int)*control_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Sy,d_Sy,sizeof(int)*control_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Svalue,d_Svalue,sizeof(float)*control_size,cudaMemcpyDeviceToHost);
 
     cudaFree(d_data);
     cudaFree(d_sum);
@@ -452,13 +461,17 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,cml_retstruc *S
     cudaFree(d_ctr);
     cudaFree(d_ctr_id1);
     cudaFree(d_ctr_id2);
-    cudaFree(d_S);
+//    cudaFree(d_S);
+    cudaFree(d_Sx);
+    cudaFree(d_Sy);
+    cudaFree(d_Svalue);
     delete[] sum;
     delete[] mean;
     delete[] stdv;
     delete[] ctr;
     delete[] ctr_id1;
     delete[] ctr_id2;
+
     //使用一个简单的kernel,不使用child kernel调用。
     //flambda需要的辅助矩阵，设置为线性格式
 
@@ -776,15 +789,24 @@ int main(int argc ,char* argv[]){
                     }
                 }
 //calculate ncc with gpu
-        cml_retstruc *S;
-                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
+//        cml_retstruc *S;
+        //
+        int *Sx;
+        int *Sy;
+        float *Svalue;
+        Sx= new int [double_local_N*(double_local_N-1)/2];
+        Sy= new int [double_local_N*(double_local_N-1)/2];
+        Svalue= new float [double_local_N*(double_local_N-1)/2];
+//                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
 		printf("before enter wrappper\n");
-                wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,S);
+                wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
-                        if (S[(2*double_local_N-1-i)*i/2+j-(i+1)].value>0.5){
-                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
-                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
+                        if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>0.5){
+//                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
+//                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
+                        cml_pair_matrix_help[i][j]=Sx[(2*double_local_N-1-i)*i/2+j-(i+1)];
+                        cml_pair_matrix_help[j][i]=Sy[(2*double_local_N-1-i)*i/2+j-(i+1)];
                         }
 
                     else{
@@ -835,6 +857,9 @@ int main(int argc ,char* argv[]){
                     }
 
             }
+            delete[] Sx;
+            delete[] Sy;
+            delete[] Svalue;
             fprintf(OUTFILE,"ncc cal finished\n");
             t_ncc_value=time(NULL);
 
