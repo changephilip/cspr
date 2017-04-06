@@ -315,8 +315,8 @@ int max_float_index(float *infloat,int size_of_array){
     }
     return max_index_return;
 }
-
-__global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d_ctr_id2,float *d_sum,float *d_mean,float *d_stdv,int N,int *Sx,int *Sy,float *Svalue){
+//__device__ float 
+__global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,float *d_sum,float *d_mean,float *d_stdv,int N,int *Sx,int *Sy,float *Svalue){
      //获取局部id
      //设置cublas环境，启动cublas_sgemm
      //设置局部变量C3,接受sgemmm的结果，估计为160K,调用子内核时，不能使用local memory,必须把C3分配在global memory
@@ -324,38 +324,62 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr,int *d_ctr_id1,int *d
     int globalThreadID=threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z);
     int image_a=d_ctr_id1[globalThreadID];
     int image_b=d_ctr_id2[globalThreadID];
+    //long int postion_a=L_power*image_a;
+    //long int postion_b=L_power*image_b;
 //    int L_power=L*L;
     int i,j;
     cublasHandle_t handle;
-    cublasCreate(&handle);
+    cublasStatus_t status;
+    status=cublasCreate(&handle);
     float alpha=1.0;
     float beta=0.0;
+    float C1[L_power];
+    float C2[L_power];
+    for (i=0;i<L_power;i++){
+	C1[i]=d_data[L_power*image_a+i];
+	C2[i]=d_data[L_power*image_b+i];
+	}
     float C3[L_power];
+    float C4[L][L];
+    if(status != CUBLAS_STATUS_SUCCESS) {
+	printf("cublasCreate fail\n");
+}
     //cudaMalloc((void**)&C3,L*L*sizeof(float));
-    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*image_b],L,&d_data[L_power*image_a],L,&beta,C3,L);
+//    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*image_b],L,&d_data[L_power*image_a],L,&beta,C3,L);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,C2,L,C1,L,&beta,C3,L);
     cublasDestroy(handle);
-
-
+/*	
+    for (i=0;i<L;i++){
+	for (j=0;j<L;j++){
+		C3[i*L+j]=0.0;
+		for (k=0;k<L;k++){
+			for (m=0;m<L;m++){
+				C3[i*L+j]+=d_data[postion_a+L*i+k]*d_data[postion_b+L*j+m];
+			}
+		}
+	}
+	}
+*/
     //help矩阵排列，直接在主机端排列好？还是kernel调用？
     for (i=0;i<L;i++){
         //image_1*L+i
         for (j=0;j<L;j++){
             //image_2*L+j
 //            C[i*L+j]=(C[i*L+j]+L*help[image_1*3].y*help[image_2*3].y-xy-yx)/(N*z*z);
-            C3[i*L+j]=(C3[i*L+j]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(N*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
+            C4[i][j]=(C3[i*L+j]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
         }
     }
 
      //分配flambda网格，让C3就地接受结果
 //     flambda();
      //C3作为参数，获得最大返回值参数，获得alpha_ij编号，并获得L中的序号。
-    float max_value=C3[0];
+    float max_value=C4[0][0];
     int max_index_i=0;
     int max_index_j=0;
     for (i=0;i<L;i++){
         for (j=0;j<L;j++){
-        if (C3[i*L+j]>max_value){
-            max_value=C3[i*L+j];
+        if (C4[i][j]>max_value){
+            max_value=C4[i][j];
             max_index_i=i;
             max_index_j=j;
             }
@@ -380,16 +404,16 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
  //   int THREAD_PER_BLOCK;//(<512,根据显卡设备的cuda参数定)
     //配置控制矩阵，alpha_ij序数控制,ctr为alphaij序数
 //    ctr = (int *)malloc(control_size);
-    int *ctr;
+   // int *ctr;
     int *ctr_id1;
     int *ctr_id2;
-    ctr= new int [control_size];
+    //ctr= new int [control_size];
     ctr_id1 = new int [control_size];
     ctr_id2 = new int [control_size];
     printf("389\n");
-    for (i=0;i<control_size;i++){
-        ctr[i]=i;
-    }
+    //for (i=0;i<control_size;i++){
+    //    ctr[i]=i;
+    //}
     for (i=0;i<N;i++){
         for (j=i+1;j<N;j++){
 //an error here ,the id is not eq i;should be modified later.((2*local_N-1-i)*i/2+j-(i+1))
@@ -398,21 +422,21 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
         }
     }
     //配置辅助矩阵help.拆分成三个数组，每个数组为N×L
-    float *sum;
-    float *mean;
-    float *stdv;
-    sum = new float [N*L];
-    mean = new float [N*L];
-    stdv = new float [N*L];
+    float *m_sum;
+    float *m_mean;
+    float *m_stdv;
+    m_sum = new float [N*cml_size];
+    m_mean = new float [N*cml_size];
+    m_stdv = new float [N*cml_size];
     for (i=0;i<N;i++){
-        for (j=0;j<L;j++){
-            sum[i*L+j]=help[i][j][0];
-            mean[i*L+j]=help[i][j][1];
-            stdv[i*L+j]=help[i][j][3];
+        for (j=0;j<cml_size;j++){
+            m_sum[i*cml_size+j]=help[i][j][0];
+            m_mean[i*cml_size+j]=help[i][j][1];
+            m_stdv[i*cml_size+j]=help[i][j][3];
         }
     }
     //printf("412\n");
-    int *d_ctr;
+    //int *d_ctr;
     int *d_ctr_id1;
     int *d_ctr_id2;
     float *d_data;
@@ -424,11 +448,11 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
     int *d_Sy;
     float *d_Svalue;
     //printf("421\n");
-    cudaMalloc((void **) &d_sum,sizeof(float)*N*L);
-    cudaMalloc((void **) &d_mean,sizeof(float)*N*L);
-    cudaMalloc((void **) &d_stdv,sizeof(float)*N*L);
-    cudaMalloc((void **) &d_data,sizeof(float)*N*L*L);
-    cudaMalloc((void **) &d_ctr,sizeof(int)*control_size);
+    cudaMalloc((void **) &d_sum,sizeof(float)*N*cml_size);
+    cudaMalloc((void **) &d_mean,sizeof(float)*N*cml_size);
+    cudaMalloc((void **) &d_stdv,sizeof(float)*N*cml_size);
+    cudaMalloc((void **) &d_data,sizeof(float)*N*cml_size*cml_size);
+    //cudaMalloc((void **) &d_ctr,sizeof(int)*control_size);
     cudaMalloc((void **) &d_ctr_id1,sizeof(int)*control_size);
     cudaMalloc((void **) &d_ctr_id2,sizeof(int)*control_size);
 
@@ -437,38 +461,38 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
     cudaMalloc((void **) &d_Sy,sizeof(int)*control_size);
     cudaMalloc((void **) &d_Svalue,sizeof(float)*control_size);
 
-    cudaMemcpy(d_sum,sum,N*L*sizeof(float),cudaMemcpyHostToDevice);
-    cudaMemcpy(d_mean,mean,N*L*sizeof(float),cudaMemcpyHostToDevice);
-    cudaMemcpy(d_stdv,stdv,N*L*sizeof(float),cudaMemcpyHostToDevice);
-    cudaMemcpy(d_ctr,ctr,control_size*sizeof(int),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,m_sum,N*L*sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean,m_mean,N*L*sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_stdv,m_stdv,N*L*sizeof(float),cudaMemcpyHostToDevice);
+    //cudaMemcpy(d_ctr,ctr,control_size*sizeof(int),cudaMemcpyHostToDevice);
     cudaMemcpy(d_ctr_id1,ctr_id1,control_size*sizeof(int),cudaMemcpyHostToDevice);
     cudaMemcpy(d_ctr_id2,ctr_id2,control_size*sizeof(int),cudaMemcpyHostToDevice);
-    cudaMemcpy(d_data,data,N*L*L*sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_data,data,N*cml_size*cml_size*sizeof(float),cudaMemcpyHostToDevice);
 //	printf("439\n");
     dim3 dimGrid(control_size/100,1,1);
     dim3 dimBlock(100,1,1);
-    parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,d_Sx,d_Sy,d_Svalue);
+    parent_ncc_kernel<<<dimGrid,dimBlock>>>(d_data,d_ctr_id1,d_ctr_id2,d_sum,d_mean,d_stdv,N,d_Sx,d_Sy,d_Svalue);
     cudaDeviceSynchronize(); 
 //    cudaMemcpy(S,d_S,sizeof(cml_retstruc)*control_size,cudaMemcpyDeviceToHost);
     cudaMemcpy(Sx,d_Sx,sizeof(int)*control_size,cudaMemcpyDeviceToHost);
     cudaMemcpy(Sy,d_Sy,sizeof(int)*control_size,cudaMemcpyDeviceToHost);
     cudaMemcpy(Svalue,d_Svalue,sizeof(float)*control_size,cudaMemcpyDeviceToHost);
-
+    
     cudaFree(d_data);
     cudaFree(d_sum);
     cudaFree(d_mean);
     cudaFree(d_stdv);
-    cudaFree(d_ctr);
+    //cudaFree(d_ctr);
     cudaFree(d_ctr_id1);
     cudaFree(d_ctr_id2);
 //    cudaFree(d_S);
     cudaFree(d_Sx);
     cudaFree(d_Sy);
     cudaFree(d_Svalue);
-    delete[] sum;
-    delete[] mean;
-    delete[] stdv;
-    delete[] ctr;
+    delete[] m_sum;
+    delete[] m_mean;
+    delete[] m_stdv;
+    //delete[] ctr;
     delete[] ctr_id1;
     delete[] ctr_id2;
 
@@ -802,7 +826,7 @@ int main(int argc ,char* argv[]){
                 wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
-                        if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>0.5){
+                        if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>=0.5){
 //                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
 //                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
                         cml_pair_matrix_help[i][j]=Sx[(2*double_local_N-1-i)*i/2+j-(i+1)];
@@ -825,8 +849,20 @@ int main(int argc ,char* argv[]){
                         diff+=(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j])*(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j]);
                     }
                 }
+		//for (i=0;i<double_local_N;i++){
+		//	for (j=0;j<double_local_N;j++){
+		//	printf("%d\t",cml_pair_matrix_help[i][j]);}
+		//	printf("\n");
+//}
+		//for (i=0;i<double_local_N*(double_local_N-1)/2;i++){
+		//	printf("%d\t%d\t%d\t%f\n",i,Sx[i],Sy[i],Svalue[i]);
+		//}
+		//printf("\n");
                 diff=sqrt(diff/double_local_N/double_local_N);
                 printf("diff between gpu_ncc with cpu_ncc\t%f\n",diff);
+		delete[] Sx;
+		delete[] Sy;
+		delete[] Svalue;
                 //test
                 /*
                 for (i=0;i<double_local_N;i++){
@@ -857,9 +893,6 @@ int main(int argc ,char* argv[]){
                     }
 
             }
-            delete[] Sx;
-            delete[] Sy;
-            delete[] Svalue;
             fprintf(OUTFILE,"ncc cal finished\n");
             t_ncc_value=time(NULL);
 
