@@ -11,6 +11,9 @@ int main(int argc,char * argv[]){
     char *outname;
     FILE *inmrc;
     FILE *outbin;
+    double scale=cml_size/144.0;
+    const int SIZE_COMP=144;
+
     while ((oc = getopt(argc,argv,"s:i:o:")) != -1)
     {
         switch(oc)
@@ -60,12 +63,15 @@ int main(int argc,char * argv[]){
 
     for (i=0;i<numItem;i++){
         float tmp[cml_size_pow];
+
 //        float tmpdft[dft_size_pow];
 
         fseek(inmrc,i*cml_size_pow*sizeof(tmp[0])+1024,SEEK_SET);
         fread(tmp,sizeof(tmp[0]),cml_size_pow,inmrc);
 
         cv::Mat image_mrc=cv::Mat(cml_size,cml_size,CV_32FC1,tmp);
+
+
 //        cv::Mat afdft_mrc=CML::imdft(image_mrc);
         cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
         CML::linearpolar(image_mrc,lp_mrc);
@@ -75,18 +81,21 @@ int main(int argc,char * argv[]){
         }
 
 //        MrcProcess::showimagecpp(lpdft_mrc);
-
+        float tmp_comp[SIZE_COMP*SIZE_COMP];
+        cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
+        cv::Mat image_comp=cv::Mat(dsize,CV_32FC1);
+        cv::resize(lp_mrc,image_comp,dsize);
 //        cv::normalize(lpdft_mrc,lpdft_mrc,0,1,CV_MINMAX);
-        CML::image_to_mat(lp_mrc,tmp,cml_size);
+        CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
         l=0;
-        for (j=0;j<cml_size;j++){
-            for (k=0;k<cml_size;k++){
-                tmp[l]=lp_mrc.at<float>(j,k);
+        for (j=0;j<SIZE_COMP;j++){
+            for (k=0;k<SIZE_COMP;k++){
+                tmp_comp[l]=lp_mrc.at<float>(j,k);
                 l=l+1;
             }
 
         }
-        fwrite(tmp,sizeof(tmp[0]),cml_size_pow,outbin);
+        fwrite(tmp_comp,sizeof(tmp_comp[0]),SIZE_COMP*SIZE_COMP,outbin);
 
     }
 
@@ -115,24 +124,28 @@ int main(int argc,char * argv[]){
 //        MrcProcess::showimagecpp(lpdft_mrc);
 
 //        cv::normalize(lpdft_mrc,lpdft_mrc,0,1,CV_MINMAX);
+        float tmp_comp[SIZE_COMP*SIZE_COMP];
+        cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
+        cv::Mat image_comp=cv::Mat(dsize,CV_32FC1);
+        cv::resize(lp_mrc,image_comp,dsize);
         l=0;
-        for (j=0;j<cml_size;j++){
-            for (k=0;k<cml_size;k++){
-                tmp[l]=lp_mrc.at<float>(j,k);
+        for (j=0;j<SIZE_COMP;j++){
+            for (k=0;k<SIZE_COMP;k++){
+                tmp_comp[l]=lp_mrc.at<float>(j,k);
                 l=l+1;
             }
 
         }
 
 
-        float tmptest[cml_size_pow];
-        fread(tmptest,sizeof(tmptest[0]),cml_size_pow,testbin);
+        float tmptest[SIZE_COMP*SIZE_COMP];
+        fread(tmptest,sizeof(tmptest[0]),SIZE_COMP*SIZE_COMP,testbin);
 
         float sum_pow=0.0;
-        for ( j=0;j<cml_size_pow;j++){
-            sum_pow=sum_pow+(tmptest[j]-tmp[j])*(tmptest[j]-tmp[j]);
+        for ( j=0;j<SIZE_COMP*SIZE_COMP;j++){
+            sum_pow=sum_pow+(tmptest[j]-tmp_comp[j])*(tmptest[j]-tmp_comp[j]);
         }
-        sum_pow=sqrt(sum_pow/cml_size_pow);
+        sum_pow=sqrt(sum_pow/SIZE_COMP*SIZE_COMP);
         if (sum_pow>0.0001){
             printf("i=%d\tsumpow=%f\n",i,sum_pow);
         }
