@@ -331,35 +331,23 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
     cublasHandle_t handle;
     cublasStatus_t status;
     status=cublasCreate(&handle);
-    float alpha=1.0;
-    float beta=0.0;
-    float C1[L_power];
-    float C2[L_power];
-    for (i=0;i<L_power;i++){
-	C1[i]=d_data[L_power*image_a+i];
-	C2[i]=d_data[L_power*image_b+i];
-	}
+    const float alpha=1.0;
+    const float beta=0.0;
+//    float C1[L_power];
+//    float C2[L_power];
+//    for (i=0;i<L_power;i++){
+//	C1[i]=d_data[L_power*image_a+i];
+//	C2[i]=d_data[L_power*image_b+i];
+//	}
     float C3[L_power];
     float C4[L][L];
-    if(status != CUBLAS_STATUS_SUCCESS) {
-	printf("cublasCreate fail\n");
-}
+ //   if(status != CUBLAS_STATUS_SUCCESS) {
+//	printf("cublasCreate fail\n");
+//}
     //cudaMalloc((void**)&C3,L*L*sizeof(float));
-//    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*image_b],L,&d_data[L_power*image_a],L,&beta,C3,L);
-    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,C2,L,C1,L,&beta,C3,L);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*image_b],L,&d_data[L_power*image_a],L,&beta,C3,L);
+//    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,C2,L,C1,L,&beta,C3,L);
     cublasDestroy(handle);
-/*	
-    for (i=0;i<L;i++){
-	for (j=0;j<L;j++){
-		C3[i*L+j]=0.0;
-		for (k=0;k<L;k++){
-			for (m=0;m<L;m++){
-				C3[i*L+j]+=d_data[postion_a+L*i+k]*d_data[postion_b+L*j+m];
-			}
-		}
-	}
-	}
-*/
     //help矩阵排列，直接在主机端排列好？还是kernel调用？
     for (i=0;i<L;i++){
         //image_1*L+i
@@ -854,10 +842,10 @@ int main(int argc ,char* argv[]){
 		//	printf("%d\t",cml_pair_matrix_help[i][j]);}
 		//	printf("\n");
 //}
-		//for (i=0;i<double_local_N*(double_local_N-1)/2;i++){
-		//	printf("%d\t%d\t%d\t%f\n",i,Sx[i],Sy[i],Svalue[i]);
-		//}
-		//printf("\n");
+		for (i=0;i<double_local_N*(double_local_N-1)/2;i++){
+			printf("%d\t%d\t%d\t%f\n",i,Sx[i],Sy[i],Svalue[i]);
+		}
+		printf("\n");
                 diff=sqrt(diff/double_local_N/double_local_N);
                 printf("diff between gpu_ncc with cpu_ncc\t%f\n",diff);
 		delete[] Sx;
