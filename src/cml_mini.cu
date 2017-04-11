@@ -29,6 +29,8 @@
  *
  *
  */
+
+/*
 __global__ void mykernel(float *d_data,float *d_result){
     int id=threadIdx.x+blockDim.x*blockIdx.x;
     cublasHandle_t handle;
@@ -40,6 +42,7 @@ __global__ void mykernel(float *d_data,float *d_result){
     cublasDestroy(handle);
 
 }
+*/
 
 /*
 __global__  void nocublas_kernel(float *d_data,float *d_result){
@@ -74,6 +77,8 @@ int main(int argc,char *argv[]){
 //    datafilename="~/..";
     fdata=fopen(datafilename,"rb");
     float *matrix;
+    const float alpha=1.0;
+    const float beta=0.0;
     int N=10;
     matrix = new float [L_power*N];
     fseek(fdata,0,SEEK_SET);
@@ -92,21 +97,22 @@ int main(int argc,char *argv[]){
 //    mykernel<<<1,10>>>(d_data,d_result);
     //    nocublas_kernel<<<1,10>>>(d_data,d_result);
 //    cudaDeviceSynchronize();
-    cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
+    //cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
 
     cudaStream_t stream[N];
     cublasHandle_t handle[N];
-    for(i=0;i<N;i++){
+    for(int i=0;i<N;i++){
         cudaStreamCreate(&stream[i]);
-        cublasCreateHandle(&handle[i]);
+        cublasCreate(&handle[i]);
     }
-    for(i=0;i<N;i++){
+    for(int i=0;i<N;i++){
         cublasSetStream(handle[i],stream[i]);
     }
-    for(i=0;i<N;i++){
+    for(int i=0;i<N;i++){
         cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
     }
     cudaThreadSynchronize();
+    cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
     float *Host_result;
     Host_result = new float [N*L_power];
     for (int i=0;i<N;i++){
