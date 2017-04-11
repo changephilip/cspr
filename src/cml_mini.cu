@@ -89,11 +89,24 @@ int main(int argc,char *argv[]){
     cudaMalloc((void **) &d_result,sizeof(float)*N*L_power);
 
     cudaMemcpy(d_data,matrix,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
-    mykernel<<<1,10>>>(d_data,d_result);
-//    nocublas_kernel<<<1,10>>>(d_data,d_result);
-    cudaDeviceSynchronize();
+//    mykernel<<<1,10>>>(d_data,d_result);
+    //    nocublas_kernel<<<1,10>>>(d_data,d_result);
+//    cudaDeviceSynchronize();
     cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
 
+    cudaStream_t stream[N];
+    cublasHandle_t handle[N];
+    for(i=0;i<N;i++){
+        cudaStreamCreate(&stream[i]);
+        cublasCreateHandle(&handle[i]);
+    }
+    for(i=0;i<N;i++){
+        cublasSetStream(handle[i],stream[i]);
+    }
+    for(i=0;i<N;i++){
+        cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
+    }
+    cudaThreadSynchronize();
     float *Host_result;
     Host_result = new float [N*L_power];
     for (int i=0;i<N;i++){
