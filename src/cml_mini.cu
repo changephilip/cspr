@@ -31,18 +31,6 @@
  */
 
 
-__global__ void mykernel(float *d_data,float *d_result,cublasHandle_t handle){
-    int id=threadIdx.x+blockDim.x*blockIdx.x;
-//    cublasHandle_t handle;
-    cublasStatus_t status;
-//    status=cublasCreate(&handle);
-    const float alpha=1.0;
-    const float beta=0.0;
-    status=cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[0],L,&d_data[0],L,&beta,&d_result[0],L);
-//    cublasDestroy(handle);
-
-}
-
 /*
 __global__ void mykernel2(float *d_data,float *max_value,cublasHandle_t handle){
 	cublasStatus_t status;
@@ -64,6 +52,60 @@ __global__ void simplekernel(float *d_process,float *d_max_value){
     *d_max_value=maxvalue;
 }
 
+__global__ void testlambda(float *d_process){
+	int id=threadIdx.x+blockDim.x*blockIdx.x;
+	d_process[id]=d_process[id]*1.0;	
+}
+
+
+
+
+__global__ void mykernel(float *d_data,float *d_result,cublasHandle_t handle){
+    int id=threadIdx.x+blockDim.x*blockIdx.x;
+    cublasHandle_t handles;
+    cublasStatus_t status;
+    status=cublasCreate(&handles);
+    const float alpha=1.0;
+    const float beta=0.0;
+    const int si=140;
+//    float *C=(float*)malloc(sizeof(float)*si*si);
+//    float *C;
+//    cudaMalloc((void **)&C,sizeof(float)*si*si); 
+    status=cublasSgemm(handles,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_data,L,d_data,L,&beta,d_result,L);
+//    for (int i=0;i<L_power;i++){
+//		C[i]=d_result[i];
+//	}
+    cublasDestroy(handles);
+    //free(C);
+//    cudaFree(C);
+}
+/*
+__global__ void mykernel_3(float *d_data,float *d_max_value){
+	cublasHandle_t handle;
+	cublasCreate(&handle);
+	const float alpha=1.0;
+	const float beta=0.0;
+	const int si=140;
+	int i=0;
+	float maxvalue;
+	float *C=(float*)malloc(sizeof(float)*si*si);
+	cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_data,L,d_data,L,&beta,C,L);
+	for (i=0;i<L_power;i++){
+		
+
+
+}
+
+*/
+//lambdakernel<<<140,140,0,stream[i]>>>(&d_result[L_power*i],&
+/*
+__global__ void lambdakernel(float *d_process,){
+	int id=threadIdx.x+blockDim.x*blockIdx.x;
+	int i=blockIdx.x;
+	int j=threadIdx.x;
+	d_process[id]=d_process[id]+1;
+}
+*/
 
 /*
 __global__  void nocublas_kernel(float *d_data,float *d_result){
@@ -133,16 +175,19 @@ int main(int argc,char *argv[]){
         cublasSetStream(handle[i],stream[i]);
     }
     for(int i=0;i<N;i++){
-        cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
-//	mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
+        //cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
+	mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
+	testlambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i]);
         simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
     //mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i]);
     }
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
     cudaMemcpy(max_value,d_max_value,sizeof(float)*N,cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
     for (int i=0;i<N;i++){
 	cublasDestroy(handle[i]);
+	cudaStreamDestroy(stream[i]);
 	}
     float *Host_result;
     float Host_max[N];

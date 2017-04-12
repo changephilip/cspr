@@ -333,14 +333,15 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
     status=cublasCreate(&handle);
     const float alpha=1.0;
     const float beta=0.0;
+    const int si=140;
 //    float C1[L_power];
 //    float C2[L_power];
 //    for (i=0;i<L_power;i++){
 //	C1[i]=d_data[L_power*image_a+i];
 //	C2[i]=d_data[L_power*image_b+i];
 //	}
-    float C3[L_power];
-    float C4[L][L];
+    float *C3=(float*)malloc(sizeof(float)*si*si);
+//    float C4[si][si];
  //   if(status != CUBLAS_STATUS_SUCCESS) {
 //	printf("cublasCreate fail\n");
 //}
@@ -354,20 +355,20 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
         for (j=0;j<L;j++){
             //image_2*L+j
 //            C[i*L+j]=(C[i*L+j]+L*help[image_1*3].y*help[image_2*3].y-xy-yx)/(N*z*z);
-            C4[i][j]=(C3[i*L+j]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
+            C3[i*L+j]=(C3[i*L+j]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
         }
     }
 
      //分配flambda网格，让C3就地接受结果
 //     flambda();
      //C3作为参数，获得最大返回值参数，获得alpha_ij编号，并获得L中的序号。
-    float max_value=C4[0][0];
+    float max_value=C3[0];
     int max_index_i=0;
     int max_index_j=0;
     for (i=0;i<L;i++){
         for (j=0;j<L;j++){
-        if (C4[i][j]>max_value){
-            max_value=C4[i][j];
+        if (C3[i*L+j]>max_value){
+            max_value=C3[i*L+j];
             max_index_i=i;
             max_index_j=j;
             }
@@ -376,9 +377,10 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
     Svalue[globalThreadID]=max_value;
     Sx[globalThreadID]=max_index_i;
     Sy[globalThreadID]=max_index_j;
-
+    free(C3);
 }
-
+void stream_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
+}
 void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
     //wrapper_kernel前应该完成，数据打包成一个长数组
     //设置控制矩阵
