@@ -31,24 +31,33 @@
  */
 
 
-__global__ void mykernel(float *d_data,float *d_result){
+__global__ void mykernel(float *d_data,float *d_result,cublasHandle_t handle){
     int id=threadIdx.x+blockDim.x*blockIdx.x;
-    cublasHandle_t handle;
+//    cublasHandle_t handle;
     cublasStatus_t status;
-    status=cublasCreate(&handle);
+//    status=cublasCreate(&handle);
     const float alpha=1.0;
-    const float beta=1.0;
-    status=cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*id],L,&d_data[L_power*id],L,&beta,&d_result[L_power*id],L);
-    cublasDestroy(handle);
+    const float beta=0.0;
+    status=cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[0],L,&d_data[0],L,&beta,&d_result[0],L);
+//    cublasDestroy(handle);
 
 }
+
+/*
+__global__ void mykernel2(float *d_data,float *max_value,cublasHandle_t handle){
+	cublasStatus_t status;
+	const float alpha=1.0;
+	const float beta=0.0;
+
+}
+*/
 
 __global__ void simplekernel(float *d_process,float *d_max_value){
     float maxvalue;
     int i;
     maxvalue=d_process[0];
     for (i=0;i<L_power;i++){
-        if (maxvalue>d_process[i]){
+        if (maxvalue<d_process[i]){
             maxvalue=d_process[i];
         }
     }
@@ -100,13 +109,12 @@ int main(int argc,char *argv[]){
     result = new float [L_power*N];
 
     float *d_data;
-//    float *d_result;
-    float *d_process[N];
-    float *max_value[N];
-    float *d_max_value[N];
-
+    float *d_result;
+//    float *d_process[N];
+    float max_value[N];
+    float *d_max_value;
     cudaMalloc((void **) &d_data,sizeof(float)*N*L_power);
-//    cudaMalloc((void **) &d_result,sizeof(float)*N*L_power);
+    cudaMalloc((void **) &d_result,sizeof(float)*N*L_power);
     cudaMalloc((void **) &d_max_value,sizeof(float)*N);
 
     cudaMemcpy(d_data,matrix,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
@@ -116,7 +124,7 @@ int main(int argc,char *argv[]){
     //cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
 
     cudaStream_t stream[N];
-    //cublasHandle_t handle[N];
+    cublasHandle_t handle[N];
     for(int i=0;i<N;i++){
         cudaStreamCreate(&stream[i]);
         cublasCreate(&handle[i]);
@@ -125,11 +133,9 @@ int main(int argc,char *argv[]){
         cublasSetStream(handle[i],stream[i]);
     }
     for(int i=0;i<N;i++){
-        float *d_temp;
-        cudaMalloc((void **)&d_temp,sizeof(float)*L_power);
-        cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_temp,L);
-        simplekernel<<<1,1,stream[i]>>>(&d_temp,&d_max_value[i]);
-        cudaFree(d_temp);
+        cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
+//	mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
+        simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
     //mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i]);
     }
     cudaThreadSynchronize();
@@ -139,20 +145,21 @@ int main(int argc,char *argv[]){
 	cublasDestroy(handle[i]);
 	}
     float *Host_result;
-    float *Host_max[N];
+    float Host_max[N];
     Host_result = new float [N*L_power];
     for (int i=0;i<N;i++){
         cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,L,L,L,1,&matrix[i*L_power],L,&matrix[i*L_power],L,0,&Host_result[i*L_power],L);
     }
+
     for (int i=0;i<N;i++){
         Host_max[i]=Host_result[i*L_power];
         for (int j=0;j<L_power;j++){
-                if (Host_max[i]>Host_result[i*L_power+j]){
+                if (Host_max[i]<Host_result[i*L_power+j]){
                     Host_max[i]=Host_result[i*L_power+j];
                 }
         }
     }
-    /*
+    
     for (int i=0;i<N;i++){
         float diff=0.0f;
         for (int j=0;j<L_power;j++){
@@ -160,13 +167,14 @@ int main(int argc,char *argv[]){
         }
         printf("diff %d\t%f\n",i,sqrt(diff/(L_power*L_power)));
     }
-    */
+    printf("DIFF %f\t%f\n",Host_result[55],result[55]);    
     for (int i=0;i<N;i++){
         printf("%d\t%f\t%f\n",i,max_value[i],Host_max[i]);
     }
 
     cudaFree(d_data);
     cudaFree(d_result);
+    cudaFree(d_max_value);
     delete[] matrix;
     delete[] result;
     delete[] Host_result;
