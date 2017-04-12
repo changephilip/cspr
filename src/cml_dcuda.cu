@@ -321,7 +321,7 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
      //设置cublas环境，启动cublas_sgemm
      //设置局部变量C3,接受sgemmm的结果，估计为160K,调用子内核时，不能使用local memory,必须把C3分配在global memory
      //调整方案，不使用子内核调用，直接部署代码
-    int globalThreadID=threadIdx.x+blockDim.x*(threadIdx.y+blockDim.y*threadIdx.z);
+    int globalThreadID=threadIdx.x+blockDim.x*blockIdx.x;
     int image_a=d_ctr_id1[globalThreadID];
     int image_b=d_ctr_id2[globalThreadID];
     //long int postion_a=L_power*image_a;

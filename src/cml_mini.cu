@@ -39,6 +39,14 @@ __global__ void mykernel2(float *d_data,float *max_value,cublasHandle_t handle){
 
 }
 */
+float MYSUM(int Num,const float *p){
+    float re=0.0f;
+    int i;
+    for(i=0;i<Num;i++){
+        re=re+p[i];
+    }
+    return re;
+}
 
 __global__ void simplekernel(float *d_process,float *d_max_value){
     float maxvalue;
@@ -68,15 +76,15 @@ __global__ void mykernel(float *d_data,float *d_result,cublasHandle_t handle){
     const float alpha=1.0;
     const float beta=0.0;
     const int si=140;
-//    float *C=(float*)malloc(sizeof(float)*si*si);
+    float *C=(float*)malloc(sizeof(float)*si*si);
 //    float *C;
 //    cudaMalloc((void **)&C,sizeof(float)*si*si); 
-    status=cublasSgemm(handles,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_data,L,d_data,L,&beta,d_result,L);
-//    for (int i=0;i<L_power;i++){
-//		C[i]=d_result[i];
-//	}
+    status=cublasSgemm(handles,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_data,L,d_data,L,&beta,C,L);
+    for (int i=0;i<L_power;i++){
+		d_result[i]=C[i];
+	}
     cublasDestroy(handles);
-    //free(C);
+    free(C);
 //    cudaFree(C);
 }
 /*
@@ -91,12 +99,12 @@ __global__ void mykernel_3(float *d_data,float *d_max_value){
 	float *C=(float*)malloc(sizeof(float)*si*si);
 	cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_data,L,d_data,L,&beta,C,L);
 	for (i=0;i<L_power;i++){
-		
+		if (maxvalue	
 
 
 }
-
 */
+
 //lambdakernel<<<140,140,0,stream[i]>>>(&d_result[L_power*i],&
 /*
 __global__ void lambdakernel(float *d_process,){
@@ -160,6 +168,48 @@ int main(int argc,char *argv[]){
     cudaMalloc((void **) &d_max_value,sizeof(float)*N);
 
     cudaMemcpy(d_data,matrix,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+
+    float **total_nccq[N];
+    for (int i=0;i<N;i++){
+	total_nccq[i]= new float* [L];
+	}
+    for (int i=0;i<N;i++){
+	for (int j=0;j<L;j++){
+		total_nccq[i][j] = new float[4];
+		}
+	}
+    float *my_mean;
+    float *my_sum;
+    float *my_dot;
+    float *my_stdv;
+    my_mean = new float [N*L];
+    my_sum = new float [N*L];
+    my_dot = new float [N*L];
+    my_stdv = new float [N*L];
+
+    for (int i=0;i<N;i++){
+	for (int j=0;j<L;j++){
+	int postion=i*L_power+j*L;
+	total_nccq[i][j][0] = MYSUM(L,&matrix[postion]);
+	my_sum[i*L+j] = MYSUM(L,&matrix[postion]);
+	total_nccq[i][j][1] = total_nccq[i][j][0] / L;
+	my_mean[i*L+j] = my_sum[i*L+j] / L;
+	total_nccq[i][j][2] = cblas_sdot( L, &matrix[postion], 1, &matrix[postion], 1);
+	my_dot[i*L+j] = cblas_sdot(L , &matrix[postion], 1,  &matrix[postion],1);
+	total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + L*total_nccq[i][j][1]*total_nccq[i][j][1]- 2*total_nccq[i][j][0]*total_nccq[i][j][1])/L);
+	my_stdv[i*L+j] = sqrt((my_dot[i*L+j]+L*my_mean[i*L+j]*my_mean[i*L+j]-2*my_mean[i*L+j]*my_sum[i*L+j])/L);
+		}
+	}
+     float *d_mean;
+     float *d_sum;
+     float *d_stdv;
+     cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
+     cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
+     cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
+	
+
+
+
 //    mykernel<<<1,10>>>(d_data,d_result);
     //    nocublas_kernel<<<1,10>>>(d_data,d_result);
 //    cudaDeviceSynchronize();
@@ -175,8 +225,8 @@ int main(int argc,char *argv[]){
         cublasSetStream(handle[i],stream[i]);
     }
     for(int i=0;i<N;i++){
-        //cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
-	mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
+        cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
+	//mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
 	testlambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i]);
         simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
     //mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i]);
@@ -220,6 +270,13 @@ int main(int argc,char *argv[]){
     cudaFree(d_data);
     cudaFree(d_result);
     cudaFree(d_max_value);
+    cudaFree(d_mean);
+    cudaFree(d_sum);
+    cudaFree(d_stdv);
+    delete[] my_mean;
+    delete[] my_sum;
+    delete[] my_dot;
+    delete[] my_stdv; 
     delete[] matrix;
     delete[] result;
     delete[] Host_result;
