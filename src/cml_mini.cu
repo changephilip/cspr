@@ -65,6 +65,12 @@ __global__ void testlambda(float *d_process){
 	d_process[id]=d_process[id]*1.0;	
 }
 
+__global__ void flambda(float *d_process,float *d_mean,float *d_sum,float *d_stdv,int image_a,int image_b){
+    int id=threadIdx.x+blockDim.x*blockIdx.x;
+    int i=blockIdx.x;
+    int j=threadIdx.x;
+    d_process[id]=(d_process[id]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
+}
 
 
 
@@ -190,13 +196,13 @@ int main(int argc,char *argv[]){
     for (int i=0;i<N;i++){
 	for (int j=0;j<L;j++){
 	int postion=i*L_power+j*L;
-	total_nccq[i][j][0] = MYSUM(L,&matrix[postion]);
+//	total_nccq[i][j][0] = MYSUM(L,&matrix[postion]);
 	my_sum[i*L+j] = MYSUM(L,&matrix[postion]);
-	total_nccq[i][j][1] = total_nccq[i][j][0] / L;
+//	total_nccq[i][j][1] = total_nccq[i][j][0] / L;
 	my_mean[i*L+j] = my_sum[i*L+j] / L;
-	total_nccq[i][j][2] = cblas_sdot( L, &matrix[postion], 1, &matrix[postion], 1);
+//	total_nccq[i][j][2] = cblas_sdot( L, &matrix[postion], 1, &matrix[postion], 1);
 	my_dot[i*L+j] = cblas_sdot(L , &matrix[postion], 1,  &matrix[postion],1);
-	total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + L*total_nccq[i][j][1]*total_nccq[i][j][1]- 2*total_nccq[i][j][0]*total_nccq[i][j][1])/L);
+//	total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + L*total_nccq[i][j][1]*total_nccq[i][j][1]- 2*total_nccq[i][j][0]*total_nccq[i][j][1])/L);
 	my_stdv[i*L+j] = sqrt((my_dot[i*L+j]+L*my_mean[i*L+j]*my_mean[i*L+j]-2*my_mean[i*L+j]*my_sum[i*L+j])/L);
 		}
 	}
@@ -206,8 +212,13 @@ int main(int argc,char *argv[]){
      cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
      cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
      cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
-	
 
+     cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L);
+     cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L);
+     cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L);
+	
+//     float *d_buffer;
+//     cudaMalloc((void **)&d_buffer,sizeof(float)*N*L_power);
 
 
 //    mykernel<<<1,10>>>(d_data,d_result);
@@ -227,7 +238,8 @@ int main(int argc,char *argv[]){
     for(int i=0;i<N;i++){
         cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
 	//mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
-	testlambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i]);
+//        testlambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i]);
+        flambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i],d_mean,d_sum,d_stdv,i,i);
         simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
     //mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i]);
     }
@@ -245,7 +257,13 @@ int main(int argc,char *argv[]){
     for (int i=0;i<N;i++){
         cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,L,L,L,1,&matrix[i*L_power],L,&matrix[i*L_power],L,0,&Host_result[i*L_power],L);
     }
-
+    for (int i=0;i<N;i++){
+        for (int j=0;j<L;j++){
+            for (int k=0;k<L;k++){
+                Host_result[i*L_power+j*L+k]=(Host_result[i*L_power+j*L+k]+L*my_mean[i*L+j]*my_mean[i*L+k]-my_sum[i*L+j]*my_mean[i*L+k]-my_sum[i*L+k]*my_mean[i*L+j])/(L*my_stdv[i*L+j]*my_stdv[i*L+k]);
+            }
+        }
+    }
     for (int i=0;i<N;i++){
         Host_max[i]=Host_result[i*L_power];
         for (int j=0;j<L_power;j++){
