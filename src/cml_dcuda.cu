@@ -575,8 +575,8 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     cudaMalloc((void **)&d_max_index,sizeof(int)*c_size);
     cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
 
-    cduaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
-    cduaMemcpy(d_sum,my_sum,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
 
     //d_buffer should be estimated to not over max_memory on GPU;
     cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
@@ -951,7 +951,8 @@ int main(int argc ,char* argv[]){
         Svalue= new float [double_local_N*(double_local_N-1)/2];
 //                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
 		printf("before enter wrappper\n");
-                wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
+       //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
+		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
                         if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>=0.5){
