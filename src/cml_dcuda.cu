@@ -576,7 +576,9 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
 
     cudaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L,cudaMemcpyHostToDevice);
 
     //d_buffer should be estimated to not over max_memory on GPU;
     cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
