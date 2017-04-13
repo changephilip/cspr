@@ -499,7 +499,145 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
 
 }
 
+__global__ void simple_max_kernel(float *data,float *d_max_value,int *d_max_index){
+    float maxvalue=data[0];
+    int i;
+    int index;
+    for (i=0;i<L_power;i++){
+        if (maxvalue<data[i]){
+            maxvalue=data[i];
+            index=i;
+        }
+    }
+    *d_max_value=maxvalue;
+    *d_max_index=index;
+}
 
+__global__ void flambda(float *d_process,float *d_sum,float *d_mean,float *d_stdv,int image_a,int image_b){
+    int id=threadIdx.x+blockDim.x*blockIdx.x;
+    int i=blockIdx.x;
+    int j=threadIdx.x;
+    d_process[id]=(d_process[id]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
+}
+
+void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
+    int c_size=N*(N-1)/2;
+    int a,b;
+    if (N%2==0){
+        a=N-1;
+        b=N/2;
+    }
+    else {
+        a=N;
+        b=(N-1)/2;
+    }
+
+    float *my_sum;
+    float *my_mean;
+    float *my_stdv;
+    int *max_index;
+
+    max_index = new int [c_size];
+
+    my_sum = new float [N*L];
+    my_mean = new float [N*L];
+    my_stdv = new float [N*L];
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<N;j++){
+            my_sum[i*L+j]=help[i][j][0];
+            my_mean[i*L+j]=help[i][j][1];
+            my_stdv[i*L+j]=help[i][j][3];
+        }
+    }
+
+
+    float *d_data;
+    float *d_sum;
+    float *d_mean;
+    float *d_stdv;
+//    int *d_Sx;
+//    int *d_Sy;
+
+    int *d_max_index;
+    float *d_Svalue;
+
+    float *d_buffer;
+
+    cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
+
+    cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
+
+//    cudaMalloc((void **)&d_Sx,sizeof(int)*c_size);
+//    cudaMalloc((void **)&d_Sy,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_max_index,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
+
+    cduaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cduaMemcpy(d_sum,my_sum,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+
+    //d_buffer should be estimated to not over max_memory on GPU;
+    cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
+
+    int ctr_id1[c_size];
+    int ctr_id2[c_size];
+    for (int i=0;i<N;i++){
+        for (int j=0;j<N;j++){
+            ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
+            ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
+        }
+    }
+    cudaStream_t stream[a];
+    cublasHandle_t handle[a];
+    for (int i=0;i<a;i++){
+        cudaStreamCreate(&stream[i]);
+        cublasCreate(&handle[i]);
+        cublasSetStream(handle[i],stream[i]);
+    }
+    const float alpha=1.0;
+    const float beta=0.0;
+    //每个流使用一个buffer，由于stream中的每个操作是队列排序的，因此的对应的buffer同一时刻只有一个kernel正在使用。
+    for (int i=0;i<b;i++){
+        for (int j=0;j<a;j++){
+            int image_A=ctr_id1[a*i+j];
+            int image_B=ctr_id2[a*i+j];
+//            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[ctr_id2[a*i+j]],L,&d_data[ctr_id1[a*i+j]],L,&beta,&d_buffer[j*L_power],L);
+            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[image_B*L_power],L,&d_data[image_A*L_power],L,&beta,&d_buffer[j*L_power],L);
+            flambda<<<L,L,0,stream[j]>>>(&d_buffer[j*L_power],d_sum,d_mean,d_stdv,image_A,image_B);
+            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
+        }
+//        cudaDeviceSynchronize();
+    }
+    cudaDeviceSynchronize();
+    cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Svalue,d_Svalue,sizeof(float)*c_size,cudaMemcpyDeviceToHost);
+
+    for(int i=0;i<a;i++){
+        cublasDestroy(handle[i]);
+        cudaStreamDestroy(stream[i]);
+    }
+
+    for(int i=0;i<c_size;i++){
+        Sx[i] = ctr_id1[max_index[i]];
+        Sy[i] = ctr_id2[max_index[i]];
+    }
+    cudaFree(d_data);
+    cudaFree(d_buffer);
+    cudaFree(d_sum);
+    cudaFree(d_mean);
+    cudaFree(d_stdv);
+    cudaFree(d_max_index);
+    cudaFree(d_Svalue);
+    delete[] my_sum;
+    delete[] my_mean;
+    delete[] my_stdv;
+    delete[] ctr_id1;
+    delete[] ctr_id2;
+    delete[] max_index;
+
+}
 
 int main(int argc ,char* argv[]){
     int oc;                     /*选项字符 */
