@@ -544,7 +544,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     my_stdv = new float [N*L];
 
     for (int i=0;i<N;i++){
-        for (int j=0;j<N;j++){
+        for (int j=0;j<L;j++){
             my_sum[i*L+j]=help[i][j][0];
             my_mean[i*L+j]=help[i][j][1];
             my_stdv[i*L+j]=help[i][j][3];
@@ -581,8 +581,12 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     //d_buffer should be estimated to not over max_memory on GPU;
     cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
 
-    int ctr_id1[c_size];
-    int ctr_id2[c_size];
+//    int ctr_id1[c_size];
+//    int ctr_id2[c_size];
+    int *ctr_id1;
+    int *ctr_id2;
+    ctr_id1 = new int [c_size];
+    ctr_id2 = new int [c_size];
     for (int i=0;i<N;i++){
         for (int j=0;j<N;j++){
             ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
