@@ -213,9 +213,9 @@ int main(int argc,char *argv[]){
      cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
      cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
 
-     cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L);
-     cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L);
-     cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L);
+     cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+     cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+     cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L,cudaMemcpyHostToDevice);
 	
 //     float *d_buffer;
 //     cudaMalloc((void **)&d_buffer,sizeof(float)*N*L_power);
