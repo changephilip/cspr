@@ -965,7 +965,7 @@ int main(int argc ,char* argv[]){
 		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
-                        if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>=0.5){
+                        if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>0.5){
 //                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
 //                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
                         cml_pair_matrix_help[i][j]=Sx[(2*double_local_N-1-i)*i/2+j-(i+1)];
@@ -986,6 +986,7 @@ int main(int argc ,char* argv[]){
                 for (i=0;i<double_local_N;i++){
                     for (j=0;j<double_local_N;j++){
                         diff+=(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j])*(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j]);
+                        printf("%d\t%d\t%f\n",i,j,(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j])*(cml_pair_matrix[i][j]-cml_pair_matrix_help[i][j]));
                     }
                 }
 		//for (i=0;i<double_local_N;i++){
@@ -1230,6 +1231,8 @@ int main(int argc ,char* argv[]){
                 delete[] cml_pair_matrix[i];
                 delete[] cml_pair_matrix_help[i];
             }
+            delete[] cml_pair_matrix;
+            delete[] cml_pair_matrix_help;
             t_end=time(NULL);
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
 	    fprintf(OUTFILE,"ncc_gpu %d\n",t_ncc_value-t_ncc_gpu);
