@@ -626,11 +626,23 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
         cublasDestroy(handle[i]);
         cudaStreamDestroy(stream[i]);
     }
-
-    for(int i=0;i<c_size;i++){
-        Sx[i] = ctr_id1[max_index[i]];
-        Sy[i] = ctr_id2[max_index[i]];
+    int L_size=L_power;
+    int *ctr_L1;
+    int *ctr_L2;
+    ctr_L1 = new int [L_power];
+    ctr_L2 = new int [L_power];
+    for (int i=0;i<L_power;i++){
+        for (int j=i+1;j<L_power;j++){
+            ctr_L1[((2*L-1-i)*i/2+j-i-1)]=i;
+            ctr_L2[((2*L-1-i)*i/2+j-i-1)]=j;
+        }
     }
+    for(int i=0;i<L_power;i++){
+        Sx[i] = ctr_L1[max_index[i]];
+        Sy[i] = ctr_L2[max_index[i]];
+    }
+    delete[] ctr_L1;
+    delete[] ctr_L2;
     cudaFree(d_data);
     cudaFree(d_buffer);
     cudaFree(d_sum);
