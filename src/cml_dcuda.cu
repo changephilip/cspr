@@ -502,7 +502,7 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
 __global__ void simple_max_kernel(float *data,float *d_max_value,int *d_max_index){
     float maxvalue=data[0];
     int i;
-    int index;
+    int index=0;
     for (i=0;i<L_power;i++){
         if (maxvalue<data[i]){
             maxvalue=data[i];
@@ -590,11 +590,12 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     ctr_id1 = new int [c_size];
     ctr_id2 = new int [c_size];
     for (int i=0;i<N;i++){
-        for (int j=0;j<N;j++){
+        for (int j=i+1;j<N;j++){
             ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
             ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
         }
     }
+    printf("598\n");
     cudaStream_t stream[a];
     cublasHandle_t handle[a];
     for (int i=0;i<a;i++){
@@ -602,6 +603,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
         cublasCreate(&handle[i]);
         cublasSetStream(handle[i],stream[i]);
     }
+    printf("599\n");
     const float alpha=1.0;
     const float beta=0.0;
     //每个流使用一个buffer，由于stream中的每个操作是队列排序的，因此的对应的buffer同一时刻只有一个kernel正在使用。
@@ -796,6 +798,7 @@ int main(int argc ,char* argv[]){
     }
 
     int t_start,t_read_file,t_ncc_value,t_end,t_all_end,t_vote_1,t_vote_2,t_vote_3;
+    int t_ncc_gpu;
     struct timeval tsBegin,tsEnd;
     t_start=time(NULL);
 
@@ -931,7 +934,7 @@ int main(int argc ,char* argv[]){
 
 //calculate ncc with cpu
                 for (i=0;i<double_local_N;i++){
-//                #pragma omp parallel for
+                #pragma omp parallel for
                     for (j=i+1;j<double_local_N;j++){
 //                    for (j=i+1;j<double_local_N;j++){
                         if (i==j){
@@ -957,6 +960,7 @@ int main(int argc ,char* argv[]){
         Svalue= new float [double_local_N*(double_local_N-1)/2];
 //                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
 		printf("before enter wrappper\n");
+		t_ncc_gpu=time(NULL);
        //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
 		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
@@ -1228,6 +1232,7 @@ int main(int argc ,char* argv[]){
             }
             t_end=time(NULL);
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
+	    fprintf(OUTFILE,"ncc_gpu %d\n",t_ncc_value-t_ncc_gpu);
             fprintf(OUTFILE,"voting time %d\n",t_end-t_ncc_value);
             fprintf(OUTFILE,"only voting time %d\n",t_vote_1-t_ncc_value);
             fprintf(OUTFILE,"sort time %d\n",t_vote_2-t_vote_1);
