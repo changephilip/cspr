@@ -400,7 +400,7 @@ void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy
     //ctr= new int [control_size];
     ctr_id1 = new int [control_size];
     ctr_id2 = new int [control_size];
-    printf("389\n");
+    //printf("389\n");
     //for (i=0;i<control_size;i++){
     //    ctr[i]=i;
     //}
@@ -595,7 +595,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
             ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
         }
     }
-    printf("598\n");
+    //printf("598\n");
     cudaStream_t stream[a];
     cublasHandle_t handle[a];
     for (int i=0;i<a;i++){
@@ -603,7 +603,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
         cublasCreate(&handle[i]);
         cublasSetStream(handle[i],stream[i]);
     }
-    printf("599\n");
+    //printf("599\n");
     const float alpha=1.0;
     const float beta=0.0;
     //每个流使用一个buffer，由于stream中的每个操作是队列排序的，因此的对应的buffer同一时刻只有一个kernel正在使用。
@@ -852,10 +852,12 @@ int main(int argc ,char* argv[]){
                 for (i=0;i<double_local_N;i++){
                     cml_pair_matrix[i]= new int[double_local_N];
                 }
+	/*
             int *cml_pair_matrix_help[double_local_N];
                 for (i=0;i<double_local_N;i++){
                     cml_pair_matrix_help[i] = new int[double_local_N];
                 }
+	*/
                 //初始化数据集
             long malloc_size=double_local_N*dft_size_pow;
             float *lineardft_matrix=new float[malloc_size];
@@ -942,7 +944,7 @@ int main(int argc ,char* argv[]){
                     }
                 }
 
-
+	/*
 //calculate ncc with cpu
                 for (i=0;i<double_local_N;i++){
                 #pragma omp parallel for
@@ -960,6 +962,8 @@ int main(int argc ,char* argv[]){
                         }
                     }
                 }
+
+	*/
 //calculate ncc with gpu
 //        cml_retstruc *S;
         //
@@ -970,7 +974,7 @@ int main(int argc ,char* argv[]){
         Sy= new int [double_local_N*(double_local_N-1)/2];
         Svalue= new float [double_local_N*(double_local_N-1)/2];
 //                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
-		printf("before enter wrappper\n");
+		//printf("before enter wrappper\n");
 		t_ncc_gpu=time(NULL);
        //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
 		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
@@ -979,20 +983,23 @@ int main(int argc ,char* argv[]){
                         if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>0.5){
 //                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
 //                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
-                        cml_pair_matrix_help[i][j]=Sx[(2*double_local_N-1-i)*i/2+j-(i+1)];
-                        cml_pair_matrix_help[j][i]=Sy[(2*double_local_N-1-i)*i/2+j-(i+1)];
+                        cml_pair_matrix[i][j]=Sx[(2*double_local_N-1-i)*i/2+j-(i+1)];
+                        cml_pair_matrix[j][i]=Sy[(2*double_local_N-1-i)*i/2+j-(i+1)];
                         }
 
                     else{
-                        cml_pair_matrix_help[i][j]=-1;
-                        cml_pair_matrix_help[j][i]=-1;
+                        cml_pair_matrix[i][j]=-1;
+                        cml_pair_matrix[j][i]=-1;
                     }}
                 }
+/*
                 for (i=0;i<double_local_N;i++){
                     cml_pair_matrix[i][i]=-1;
                     cml_pair_matrix_help[i][i]=-1;
                 }
+*/
                 //test GPU with cpu
+/*
                 float diff=0.0f;
                 for (i=0;i<double_local_N;i++){
                     for (j=0;j<double_local_N;j++){
@@ -1000,6 +1007,7 @@ int main(int argc ,char* argv[]){
                         printf("%d\t%d\t%d\t%d\n",i,j,cml_pair_matrix[i][j],cml_pair_matrix_help[i][j]);
                     }
                 }
+*/
 		//for (i=0;i<double_local_N;i++){
 		//	for (j=0;j<double_local_N;j++){
 		//	printf("%d\t",cml_pair_matrix_help[i][j]);}
@@ -1008,9 +1016,9 @@ int main(int argc ,char* argv[]){
 //		for (i=0;i<double_local_N*(double_local_N-1)/2;i++){
 //			printf("%d\t%d\t%d\t%f\n",i,Sx[i],Sy[i],Svalue[i]);
 //		}
-		printf("\n");
-                diff=sqrt(diff/double_local_N/double_local_N);
-                printf("diff between gpu_ncc with cpu_ncc\t%f\n",diff);
+//		printf("\n");
+//                diff=sqrt(diff/double_local_N/double_local_N);
+//                printf("diff between gpu_ncc with cpu_ncc\t%f\n",diff);
 		delete[] Sx;
 		delete[] Sy;
 		delete[] Svalue;
@@ -1240,7 +1248,7 @@ int main(int argc ,char* argv[]){
             delete[] hist_peak;
             for (i=0;i<double_local_N;i++){
                 delete[] cml_pair_matrix[i];
-                delete[] cml_pair_matrix_help[i];
+//                delete[] cml_pair_matrix_help[i];
             }
             t_end=time(NULL);
             fprintf(OUTFILE,"ncc_time %d\n",t_ncc_value-t_start);
