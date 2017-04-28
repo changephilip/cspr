@@ -72,6 +72,87 @@ __global__ void flambda(float *d_process,float *d_mean,float *d_sum,float *d_std
     d_process[id]=(d_process[id]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
 }
 
+__global__ void reduction_kernel(float *d_process,float *d_max_value,int *d_max_index,int N){
+	extern __shared__ float mPartials[];
+	extern __shared__ int iPartials[];
+	const int tid = threadIdx.x;
+	const int gid = blockDim.x*blockDim.x + tid;
+	float max_value = d_process[gid];
+	int max_index = gid;
+	for (size_t i = gid;i<N;i +=blockDim.x*gridDim.x){
+		max_value=fmaxf(max_value,d_process[i]);
+		if (max_value==d_process[i]){
+			max_index=i;
+			}
+		}
+	mPartials[tid]=max_value;
+	iPartials[tid]=max_index;
+	__syncthreads();	
+	for (int activeThreads = blockDim.x>>1;
+		 activeThreads ;
+		 activeThreads >>= 1){
+		if ( tid < activeThreads){
+			mPartials[tid]=fmaxf(mPartials[tid],mPartials[tid+activeThreads]);
+			if (mPartials[tid]==mPartials[tid+activeThreads]){
+				iPartials[tid]=iPartials[tid+activeThreads];
+				}
+			}
+			__syncthreads();
+		}
+	if (tid==0){
+		d_max_value[blockIdx.x] = mPartials[0];
+		d_max_index[blockIdx.x] = iPartials[0];
+		}
+}
+
+__global__ void reduction6_kernel(float *d_in,int *d_in_index,float *d_out_max_value,int *d_out_max_index,int N){
+		extern __shared__ float mPartials[];
+		extern __shared__ int iPartials[];
+		const int tid = threadIdx.x;
+		const int gid = blockIdx.x*blockDim.x + tid;
+		float max_value = d_in[gid];
+		int max_index = gid;
+		for (size_t i = gid; i < N ; i += blockDim.x*gridDim.x ){
+			max_value = fmaxf(max_value,d_in[i]);
+			if (max_value==d_in[i]){
+//				max_index=i;
+				max_index=d_in_index[i];
+				}
+			}
+		mPartials[tid] = max_value;
+		iPartials[tid] = max_index;
+		__syncthreads();
+
+		int floorPow2 = blockDim.x;
+		if ( floorPow2 & (floorPow2 -1 ) ){
+			while (floorPow2 & (floorPow2 -1)){
+				floorPow2 &= floorPow2 -1;
+				}
+			if (tid >= floorPow2){
+				mPartials[tid-floorPow2] = fmaxf(mPartials[tid-floorPow2],mPartials[tid]);
+				if (mPartials[tid-floorPow2]==mPartials[tid]){
+					iPartials[tid-floorPow2]=iPartials[tid];
+					}
+				}
+			__syncthreads();
+		}
+		
+		for (int activeThreads = floorPow2>>1;
+			activeThreads;
+			activeThreads >>= 1){
+			if (tid < activeThreads){
+				mPartials[tid] = fmaxf(mPartials[tid],mPartials[tid+activeThreads]);
+				if (mPartials[tid]==mPartials[tid+activeThreads]){
+					iPartials[tid]=iPartials[tid+activeThreads];
+				}
+			}
+			__syncthreads();
+		}
+		if (tid == 0){
+			d_out_max_value[blockIdx.x] = mPartials[0];
+			d_out_max_index[blockIdx.x] = iPartials[0];
+			}
+	}
 
 
 __global__ void mykernel(float *d_data,float *d_result,cublasHandle_t handle){
@@ -168,12 +249,28 @@ int main(int argc,char *argv[]){
     float *d_result;
 //    float *d_process[N];
     float max_value[N];
+    int index[N];
     float *d_max_value;
+    int *d_index;
     cudaMalloc((void **) &d_data,sizeof(float)*N*L_power);
     cudaMalloc((void **) &d_result,sizeof(float)*N*L_power);
     cudaMalloc((void **) &d_max_value,sizeof(float)*N);
+    cudaMalloc((void **) &d_index,sizeof(int)*N);
 
     cudaMemcpy(d_data,matrix,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+	
+    float *d_maxvalue_partial;
+    int *d_index_partial;
+
+    int *std_index;
+    std_index = new int [L_power];
+    for (int i=0;i<L_power;i++){
+	std_index[i]=i;
+	}
+    int *d_std_index;
+    cudaMalloc((void **) &d_std_index,sizeof(int)*L_power);
+    cudaMemcpy(d_std_index,std_index,sizeof(int)*L_power,cudaMemcpyHostToDevice);
+    
 
     float **total_nccq[N];
     for (int i=0;i<N;i++){
@@ -235,17 +332,23 @@ int main(int argc,char *argv[]){
     for(int i=0;i<N;i++){
         cublasSetStream(handle[i],stream[i]);
     }
+    int numofBlocks=10;
+    cudaMalloc((void **)&d_maxvalue_partial,sizeof(float)*N*numofBlocks);
+    cudaMalloc((void **)&d_index_partial,sizeof(int)*N*numofBlocks);
     for(int i=0;i<N;i++){
         cublasSgemm(handle[i],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[L_power*i],L,&d_data[L_power*i],L,&beta,&d_result[L_power*i],L);
 	//mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i],handle[i]);
 //        testlambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i]);
         flambda<<<L,L,0,stream[i]>>>(&d_result[L_power*i],d_mean,d_sum,d_stdv,i,i);
-        simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
+	reduction6_kernel<<<10,32,32*(sizeof(float)+sizeof(int)),stream[i]>>>(&d_result[L_power*i],d_std_index,&d_maxvalue_partial[i*10],&d_index_partial[i*10],L_power);
+	reduction6_kernel<<<1,32,32*(sizeof(float)+sizeof(int)),stream[i]>>>(&d_maxvalue_partial[i*10],&d_index_partial[i*10],&d_max_value[i],&d_index[i],10);
+//        simplekernel<<<1,1,0,stream[i]>>>(&d_result[L_power*i],&d_max_value[i]);
     //mykernel<<<1,1,0,stream[i]>>>(&d_data[L_power*i],&d_result[L_power*i]);
     }
     cudaDeviceSynchronize();
     cudaMemcpy(result,d_result,sizeof(float)*N*L_power,cudaMemcpyDeviceToHost);
     cudaMemcpy(max_value,d_max_value,sizeof(float)*N,cudaMemcpyDeviceToHost);
+    cudaMemcpy(index,d_index,sizeof(int)*N,cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     for (int i=0;i<N;i++){
 	cublasDestroy(handle[i]);
@@ -253,6 +356,7 @@ int main(int argc,char *argv[]){
 	}
     float *Host_result;
     float Host_max[N];
+    int Host_index[N];
     Host_result = new float [N*L_power];
     for (int i=0;i<N;i++){
         cblas_sgemm(CblasRowMajor,CblasNoTrans,CblasTrans,L,L,L,1,&matrix[i*L_power],L,&matrix[i*L_power],L,0,&Host_result[i*L_power],L);
@@ -266,9 +370,11 @@ int main(int argc,char *argv[]){
     }
     for (int i=0;i<N;i++){
         Host_max[i]=Host_result[i*L_power];
+	Host_index[i]=0;
         for (int j=0;j<L_power;j++){
                 if (Host_max[i]<Host_result[i*L_power+j]){
                     Host_max[i]=Host_result[i*L_power+j];
+		    Host_index[i]=j;
                 }
         }
     }
@@ -282,7 +388,7 @@ int main(int argc,char *argv[]){
     }
     printf("DIFF %f\t%f\n",Host_result[55],result[55]);    
     for (int i=0;i<N;i++){
-        printf("%d\t%f\t%f\n",i,max_value[i],Host_max[i]);
+        printf("%d\t%f\t%f\t%d\t%d\n",i,max_value[i],Host_max[i],index[i],Host_index[i]);
     }
 
     cudaFree(d_data);
@@ -291,6 +397,9 @@ int main(int argc,char *argv[]){
     cudaFree(d_mean);
     cudaFree(d_sum);
     cudaFree(d_stdv);
+    cudaFree(d_std_index);
+    cudaFree(d_maxvalue_partial);
+    cudaFree(d_index_partial);
     delete[] my_mean;
     delete[] my_sum;
     delete[] my_dot;
@@ -298,6 +407,7 @@ int main(int argc,char *argv[]){
     delete[] matrix;
     delete[] result;
     delete[] Host_result;
+    delete[] std_index;
     fclose(fdata);
     return 1;
 
