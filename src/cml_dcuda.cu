@@ -512,7 +512,32 @@ __global__ void simple_max_kernel(float *data,float *d_max_value,int *d_max_inde
     *d_max_value=maxvalue;
     *d_max_index=index;
 }
-
+__global__ void my_reduction_kernel1(float *d_in,float *d_out,int *d_out_index,int N){
+    const int globalid=(blockDim.x*blockIdx.x+threadIdx.x);
+    int i;
+    float local_max=d_in[globalid];
+    int local_max_index=globalid;
+    for (int i=1;i<N;i++){
+        local_max=fmaxf(local_max,d_in[globalid+i*N]);
+        if (local_max==d_in[globalid+i*N]){
+            local_max_index=globalid+i*N;
+            }
+        }
+    d_out[threadIdx.x]=local_max;
+    d_out_index[threadIdx.x]=local_max_index;
+    }
+__global__ void my_reduction_kernel2(float *d_in,int *index_in,float *d_out,int *d_out_index,int N){
+    float local_max=d_in[0];
+    int max_index=index_in[0];
+    for (int i=1;i<N;i++){
+        local_max=fmaxf(local_max,d_in[i]);
+        if (local_max==d_in[i]){
+            max_index=index_in[i];
+            }
+        }
+    *d_out=local_max;
+    *d_out_index=max_index;
+}
 __global__ void flambda(float *d_process,float *d_sum,float *d_mean,float *d_stdv,int image_a,int image_b){
     int id=threadIdx.x+blockDim.x*blockIdx.x;
     int i=blockIdx.x;
@@ -564,6 +589,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
 
     float *d_buffer;
 
+
     cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
 
     cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
@@ -582,6 +608,14 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
 
     //d_buffer should be estimated to not over max_memory on GPU;
     cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
+
+    //allocate mem for max_kernel's buffer,d_p,d_i,length=N*L;
+    float *d_p;
+    int *d_i;
+
+    cudaMalloc((void **)&d_p,sizeof(float)*L*N);
+    cudaMalloc((void **)&d_i,sizeof(int)*L*N);
+
 
 //    int ctr_id1[c_size];
 //    int ctr_id2[c_size];
@@ -614,7 +648,9 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
 //            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[ctr_id2[a*i+j]],L,&d_data[ctr_id1[a*i+j]],L,&beta,&d_buffer[j*L_power],L);
             cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[image_B*L_power],L,&d_data[image_A*L_power],L,&beta,&d_buffer[j*L_power],L);
             flambda<<<L,L,0,stream[j]>>>(&d_buffer[j*L_power],d_sum,d_mean,d_stdv,image_A,image_B);
-            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
+//            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
+            my_reduction_kernel1<<<1,L,0,stream[j]>>>(&d_buffer[j*L_power],&d_p[j*L],&d_i[j*L],L_power);
+            my_reduction_kernel2<<<1,1,0,stream[j]>>>(&d_p[j*L],&d_i[j*L],&d_Svalue[a*i+j],&d_max_index[a*i+j],L);
         }
 //        cudaDeviceSynchronize();
     }
@@ -649,6 +685,8 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     cudaFree(d_stdv);
     cudaFree(d_max_index);
     cudaFree(d_Svalue);
+    cudaFree(d_p);
+    cudaFree(d_i);
     delete[] my_sum;
     delete[] my_mean;
     delete[] my_stdv;
