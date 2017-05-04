@@ -184,6 +184,11 @@ __global__ void simple_kel(float *d_in,float *d_out,int *d_out_index,int N){
 	*d_out=local_max;
 	*d_out_index=max_index;
 }
+
+__global__ void com_kernel(float *d_in,float *d_p,int *d_pi,float *d_out,int *d_out_index,int N){
+    my_reduction_kernel1<<<1,L>>>(d_in,d_p,d_pi,N);
+    my_reduction_kernel2<<<1,1>>>(d_p,d_pi,d_out,d_out_index,L);
+}
 	
 		
 int main(){
@@ -220,6 +225,7 @@ int main(){
 	my_reduction_kernel1<<<1,L>>>(d_A,d_p,d_pi,L);
 	my_reduction_kernel2<<<1,1>>>(d_p,d_pi,d_sum,d_max,L);
 	simple_kel<<<1,1>>>(d_A,d_sum,d_max,L);
+	com_kernel<<<1,1>>>(d_A,d_p,d_pi,d_sum,d_max,L);
 	cudaDeviceSynchronize();
 	cudaMemcpy(&h_sum,d_sum,sizeof(float),cudaMemcpyDeviceToHost);
 	cudaMemcpy(&h_max,d_max,sizeof(int),cudaMemcpyDeviceToHost);
