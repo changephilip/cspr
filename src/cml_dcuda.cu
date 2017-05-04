@@ -545,6 +545,22 @@ __global__ void flambda(float *d_process,float *d_sum,float *d_mean,float *d_std
     d_process[id]=(d_process[id]+L*d_mean[image_a*L+i]*d_mean[image_b*L+j]-d_sum[image_a*L+i]*d_mean[image_b*L+j]-d_mean[image_a*L+i]*d_sum[image_b*L+j])/(L*d_stdv[image_a*L+i]*d_stdv[image_b*L+j]);
 }
 
+__global__ void huge_kernel(int ctrid,int *ctr1,int *ctr2,float *d_data,float *d_sum,float *d_mean,float *d_stdv,float *d_buffer,float *d_p,int *d_pi,float *d_Svalue,int *d_max_index,int N){
+    int gid=threadIdx.x+blockDim.x*blockIdx.x;
+    int A=ctr1[gid];
+    int B=ctr2[gid];
+    const float alpha=1.0f;
+    const float beta=0.0f;
+    cublasHandle handle;
+    cublasCreate(&handle);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[B*L_power],L,&d_data[A*L_power],L,&beta,&d_buffer[gid*L_power],L);
+    cublasDestroy(handle);
+    flambda<<<L,L>>>(&d_buffer[gid*L_power],d_sum,d_mean,d_stdv,A,B);
+    my_reduction_kernel1<<<1,L>>>(&d_buffer[gid*L_power],&d_p[gid*L],&d_pi[gid*L],L);
+    my_reduction_kernel2<<<1,1>>>(&d_p[gid*L],&d_pi[gid*L],&d_Svalue[ctrid+gid],&d_max_index[ctrid+gid],L);
+
+}
+
 void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
     int c_size=N*(N-1)/2;
     int a,b;
@@ -662,6 +678,136 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
         cublasDestroy(handle[i]);
         cudaStreamDestroy(stream[i]);
     }
+    int *ctr_L1;
+    int *ctr_L2;
+    ctr_L1 = new int [L_power];
+    ctr_L2 = new int [L_power];
+    for (int i=0;i<L;i++){
+        for (int j=0;j<L;j++){
+            ctr_L1[i*L+j]=i;
+            ctr_L2[i*L+j]=j;
+        }
+    }
+    for(int i=0;i<c_size;i++){
+        Sx[i] = ctr_L1[max_index[i]];
+        Sy[i] = ctr_L2[max_index[i]];
+    }
+    delete[] ctr_L1;
+    delete[] ctr_L2;
+    cudaFree(d_data);
+    cudaFree(d_buffer);
+    cudaFree(d_sum);
+    cudaFree(d_mean);
+    cudaFree(d_stdv);
+    cudaFree(d_max_index);
+    cudaFree(d_Svalue);
+    cudaFree(d_p);
+    cudaFree(d_pi);
+    delete[] my_sum;
+    delete[] my_mean;
+    delete[] my_stdv;
+    delete[] ctr_id1;
+    delete[] ctr_id2;
+    delete[] max_index;
+
+}
+
+void huge_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
+    int c_size=N*(N-1)/2;
+    int a,b;
+    if (N%2==0){
+        a=N-1;
+        b=N/2;
+    }
+    else {
+        a=N;
+        b=(N-1)/2;
+    }
+
+    float *my_sum;
+    float *my_mean;
+    float *my_stdv;
+    int *max_index;
+
+    max_index = new int [c_size];
+
+    my_sum = new float [N*L];
+    my_mean = new float [N*L];
+    my_stdv = new float [N*L];
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<L;j++){
+            my_sum[i*L+j]=help[i][j][0];
+            my_mean[i*L+j]=help[i][j][1];
+            my_stdv[i*L+j]=help[i][j][3];
+        }
+    }
+
+
+    float *d_data;
+    float *d_sum;
+    float *d_mean;
+    float *d_stdv;
+//    int *d_Sx;
+//    int *d_Sy;
+
+    int *d_max_index;
+    float *d_Svalue;
+
+    float *d_buffer;
+
+
+    cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
+
+    cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
+
+//    cudaMalloc((void **)&d_Sx,sizeof(int)*c_size);
+//    cudaMalloc((void **)&d_Sy,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_max_index,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
+
+    cudaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+
+    //d_buffer should be estimated to not over max_memory on GPU;
+    cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
+
+    //allocate mem for max_kernel's buffer,d_p,d_i,length=a*L;
+    float *d_p;
+    int *d_pi;
+
+    cudaMalloc((void **)&d_p,sizeof(float)*L*a);
+    cudaMalloc((void **)&d_pi,sizeof(int)*L*a);
+
+
+//    int ctr_id1[c_size];
+//    int ctr_id2[c_size];
+    int *ctr_id1;
+    int *ctr_id2;
+    ctr_id1 = new int [c_size];
+    ctr_id2 = new int [c_size];
+    for (int i=0;i<N;i++){
+        for (int j=i+1;j<N;j++){
+            ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
+            ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
+        }
+    }
+    //printf("598\n");
+    cudaStream_t stream;
+    //printf("599\n");
+
+    for (int i=0;i<a;i++){
+        huge_kernel<<<1,b,0,stream>>>(a*i,ctr_id1,ctr_id2,d_data,d_sum,d_mean,d_stdv,d_buffer,d_p,d_pi,d_Svalue,d_max_index,L);
+    }
+    cudaDeviceSynchronize();
+    cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Svalue,d_Svalue,sizeof(float)*c_size,cudaMemcpyDeviceToHost);
+
+
     int *ctr_L1;
     int *ctr_L2;
     ctr_L1 = new int [L_power];
