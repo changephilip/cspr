@@ -148,7 +148,6 @@ __global__ void reduction3_kernel(float *d_in,int *d_in_index,float *d_out,int *
 	}
 __global__ void my_reduction_kernel1(float *d_in,float *d_out,int *d_out_index,int N){
 	const int globalid=(blockDim.x*blockIdx.x+threadIdx.x);
-	int i;
 	float local_max=d_in[globalid];
 	int local_max_index=globalid;
 	for (int i=1;i<N;i++){
@@ -172,6 +171,20 @@ __global__ void my_reduction_kernel2(float *d_in,int *index_in,float *d_out,int 
 	*d_out=local_max;
 	*d_out_index=max_index;
 }
+__global__ void simple_kel(float *d_in,float *d_out,int *d_out_index,int N){
+	float local_max=d_in[0];
+	int max_index=0;
+	int NP=N*N;
+	for (int i=1;i<NP;i++){
+		local_max=fmaxf(local_max,d_in[i]);
+		if (local_max==d_in[i]){
+			max_index=i;
+			}
+		}
+	*d_out=local_max;
+	*d_out_index=max_index;
+}
+	
 		
 int main(){
 	float A[L_power];
@@ -206,6 +219,7 @@ int main(){
 	
 	my_reduction_kernel1<<<1,L>>>(d_A,d_p,d_pi,L);
 	my_reduction_kernel2<<<1,1>>>(d_p,d_pi,d_sum,d_max,L);
+	simple_kel<<<1,1>>>(d_A,d_sum,d_max,L);
 	cudaDeviceSynchronize();
 	cudaMemcpy(&h_sum,d_sum,sizeof(float),cudaMemcpyDeviceToHost);
 	cudaMemcpy(&h_max,d_max,sizeof(int),cudaMemcpyDeviceToHost);

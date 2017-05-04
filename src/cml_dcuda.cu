@@ -609,12 +609,12 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     //d_buffer should be estimated to not over max_memory on GPU;
     cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
 
-    //allocate mem for max_kernel's buffer,d_p,d_i,length=N*L;
+    //allocate mem for max_kernel's buffer,d_p,d_i,length=a*L;
     float *d_p;
-    int *d_i;
+    int *d_pi;
 
-    cudaMalloc((void **)&d_p,sizeof(float)*L*N);
-    cudaMalloc((void **)&d_i,sizeof(int)*L*N);
+    cudaMalloc((void **)&d_p,sizeof(float)*L*a);
+    cudaMalloc((void **)&d_pi,sizeof(int)*L*a);
 
 
 //    int ctr_id1[c_size];
@@ -649,8 +649,8 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
             cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[image_B*L_power],L,&d_data[image_A*L_power],L,&beta,&d_buffer[j*L_power],L);
             flambda<<<L,L,0,stream[j]>>>(&d_buffer[j*L_power],d_sum,d_mean,d_stdv,image_A,image_B);
 //            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
-            my_reduction_kernel1<<<1,L,0,stream[j]>>>(&d_buffer[j*L_power],&d_p[j*L],&d_i[j*L],L_power);
-            my_reduction_kernel2<<<1,1,0,stream[j]>>>(&d_p[j*L],&d_i[j*L],&d_Svalue[a*i+j],&d_max_index[a*i+j],L);
+            my_reduction_kernel1<<<1,L,0,stream[j]>>>(&d_buffer[j*L_power],&d_p[j*L],&d_pi[j*L],L);
+            my_reduction_kernel2<<<1,1,0,stream[j]>>>(&d_p[j*L],&d_pi[j*L],&d_Svalue[a*i+j],&d_max_index[a*i+j],L);
         }
 //        cudaDeviceSynchronize();
     }
@@ -686,7 +686,7 @@ void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,
     cudaFree(d_max_index);
     cudaFree(d_Svalue);
     cudaFree(d_p);
-    cudaFree(d_i);
+    cudaFree(d_pi);
     delete[] my_sum;
     delete[] my_mean;
     delete[] my_stdv;
@@ -880,7 +880,7 @@ int main(int argc ,char* argv[]){
 
 
         int control=0;
-        for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
+        for  (control=0;control<1;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
             int local_start=control_struct[control][0]*dft_size_pow;//文件中，这次control的粒子的起始位置
@@ -1012,7 +1012,7 @@ int main(int argc ,char* argv[]){
         Sy= new int [double_local_N*(double_local_N-1)/2];
         Svalue= new float [double_local_N*(double_local_N-1)/2];
 //                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
-		//printf("before enter wrappper\n");
+//		printf("before enter wrappper\n");
 		t_ncc_gpu=time(NULL);
        //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
 		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
