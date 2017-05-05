@@ -185,8 +185,14 @@ __global__ void simple_kel(float *d_in,float *d_out,int *d_out_index,int N){
 	*d_out_index=max_index;
 }
 
-__global__ void com_kernel(float *d_in,float *d_p,int *d_pi,float *d_out,int *d_out_index,int N){
-    my_reduction_kernel1<<<1,L>>>(d_in,d_p,d_pi,N);
+__global__ void com_kernel(float *d_in,float *d_b,float *d_p,int *d_pi,float *d_out,int *d_out_index,int N){
+    const float alpha=1.0f;
+    const float beta=0.0f;
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,d_in,L,d_in,L,&beta,d_b,L);
+    cublasDestroy(handle);
+    my_reduction_kernel1<<<1,L>>>(d_b,d_p,d_pi,N);
     my_reduction_kernel2<<<1,1>>>(d_p,d_pi,d_out,d_out_index,L);
 }
 	
@@ -205,6 +211,7 @@ int main(){
 	int *d_index;
 	float *d_sum;
 	float *d_p;
+	float *d_b;
 	int *d_pi;
 	int *d_max;
 	cudaMalloc((void **)&d_A,sizeof(float)*L_power);
@@ -213,7 +220,7 @@ int main(){
 	cudaMalloc((void **)&d_max,sizeof(int));
 	cudaMalloc((void **)&d_p,sizeof(float)*L);
 	cudaMalloc((void **)&d_pi,sizeof(int)*L);
-	
+	cudaMalloc((void **)&d_b,sizeof(float)*L_power);	
 	cudaMemcpy(d_A,A,sizeof(float)*L_power,cudaMemcpyHostToDevice);
 	cudaMemcpy(d_index,index,sizeof(int)*L_power,cudaMemcpyHostToDevice);
 
@@ -225,7 +232,7 @@ int main(){
 	my_reduction_kernel1<<<1,L>>>(d_A,d_p,d_pi,L);
 	my_reduction_kernel2<<<1,1>>>(d_p,d_pi,d_sum,d_max,L);
 	simple_kel<<<1,1>>>(d_A,d_sum,d_max,L);
-	com_kernel<<<1,1>>>(d_A,d_p,d_pi,d_sum,d_max,L);
+	com_kernel<<<1,1>>>(d_A,d_b,d_p,d_pi,d_sum,d_max,L);
 	cudaDeviceSynchronize();
 	cudaMemcpy(&h_sum,d_sum,sizeof(float),cudaMemcpyDeviceToHost);
 	cudaMemcpy(&h_max,d_max,sizeof(int),cudaMemcpyDeviceToHost);
@@ -235,6 +242,7 @@ int main(){
 	cudaFree(d_pi);
 	cudaFree(d_A);
 	cudaFree(d_p);
+	cudaFree(d_b);
 	
 	printf("sum is %f\n",h_sum);
 	printf("index is %d\n",h_max);
