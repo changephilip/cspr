@@ -26,6 +26,8 @@ int main(int argc ,char* argv[]){
     int iteration=0;
     int debug_flag=0;
     int iteration_SIZE=0;
+    int rateOfNoise=0;
+    float rate;
 //    int noise_flag=0;
     char* filename;
     char* good_particle;
@@ -33,7 +35,7 @@ int main(int argc ,char* argv[]){
     char* noisefile;
 //    char* directdiskfile;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:n:f:p:v:k:i:d:l:o:hN:")) != -1)
+    while((oc = getopt(argc, argv, "s:n:f:p:v:k:i:d:l:o:hN:r:")) != -1)
     {
         switch(oc)
         {
@@ -70,6 +72,10 @@ int main(int argc ,char* argv[]){
             break;
         case 'o':
             logfile=optarg;
+            break;
+	case 'r':
+	    rateOfNoise=atoi(optarg);
+	    rate=rateOfNoise*0.01;
             break;
         case 'h':
             printf("CML_NONPART is a program that picks high quality particles and throw out non-particles\n");
@@ -172,9 +178,9 @@ int main(int argc ,char* argv[]){
     int iteration_size;
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
-        iteration_size=iteration_SIZE;
+	int Noise_N=iteration_SIZE*rate;
         int n_iteration;
-
+	iteration_size=iteration_SIZE-Noise_N;
         int last_iteration=N%iteration_size;
         if (last_iteration==0){
             n_iteration=N/iteration_size;
@@ -195,11 +201,11 @@ int main(int argc ,char* argv[]){
 
 
         int control=0;
-        for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
+        for  (control=0;control<n_iteration-1;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
             int local_start=control_struct[control][0]*dft_size_pow;//文件中，这次control的粒子的起始位置
-            int double_local_N=2*local_N;
+            int double_local_N=local_N+Noise_N;
 //            int local_size_index=local_size*(local_size-1)/2;
             int *cml_pair_matrix[double_local_N];
                 for (i=0;i<double_local_N;i++){
@@ -212,7 +218,7 @@ int main(int argc ,char* argv[]){
             fread(lineardft_matrix,sizeof(float),local_N*dft_size_pow,f);
             //读入Noise文件，将Noise文件乱序，取和local_N等量的噪音图像
             std::random_shuffle(List_Noise,List_Noise+N_noise);
-            for (i=0;i<local_N;i++){
+            for (i=0;i<Noise_N;i++){
                 fseek(fnoise,List_Noise[i]*dft_size_pow*sizeof(float),SEEK_SET);
                 fread(&lineardft_matrix[(local_N+i)*dft_size_pow],sizeof(float),dft_size_pow,fnoise);
             }
@@ -291,7 +297,7 @@ int main(int argc ,char* argv[]){
 
                 for (i=0;i<double_local_N;i++){
                 #pragma omp parallel for
-                    for (j=0;j<double_local_N;j++){
+                    for (j=i+1;j<double_local_N;j++){
                         if (i==j){
                             cml_pair_matrix[i][j]=-1;
                         }
@@ -370,7 +376,7 @@ int main(int argc ,char* argv[]){
                     long int alpha_ij=((2*double_local_N-1-i)*i/2+j-(i+1));
                     if (cml_pair_matrix[i][j]!=-1){
                         float tmp_voting[double_local_N];
-                        float tmp_hist[T]={0.0};
+                        float tmp_hist[72]={0.0};
 #pragma omp parallel for
                         for (k=0;k<double_local_N;k++){
                             if (k!=i and k!=j){

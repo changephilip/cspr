@@ -11,7 +11,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <math.h>
-#include <cblas.h>
+#include <openblas/cblas.h>
 #include <algorithm>
 using namespace std;
 typedef struct{
