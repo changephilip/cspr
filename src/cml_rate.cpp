@@ -7,6 +7,57 @@
 /// this program is used to predict differen rate particles distrubution
 /// rate generate randomly to observe our prediction
 ////////////////////////////////////////
+#include <gsl/gsl_multifit.h>
+#include <stdbool.h>
+bool polynomialfit(int obs, int degree,
+           double *dx, double *dy, double *store) /* n, p */
+{
+  gsl_multifit_linear_workspace *ws;
+  gsl_matrix *cov, *X;
+  gsl_vector *y, *c;
+  double chisq;
+
+  int i, j;
+
+  X = gsl_matrix_alloc(obs, degree);
+  y = gsl_vector_alloc(obs);
+  c = gsl_vector_alloc(degree);
+  cov = gsl_matrix_alloc(degree, degree);
+
+  for(i=0; i < obs; i++) {
+    for(j=0; j < degree; j++) {
+      gsl_matrix_set(X, i, j, pow(dx[i], j));
+    }
+    gsl_vector_set(y, i, dy[i]);
+  }
+
+  ws = gsl_multifit_linear_alloc(obs, degree);
+  gsl_multifit_linear(X, y, c, cov, &chisq, ws);
+
+  /* store result ... */
+  for(i=0; i < degree; i++)
+  {
+    store[i] = gsl_vector_get(c, i);
+  }
+
+  gsl_multifit_linear_free(ws);
+  gsl_matrix_free(X);
+  gsl_matrix_free(cov);
+  gsl_vector_free(y);
+  gsl_vector_free(c);
+  return true; /* we do not "analyse" the result (cov matrix mainly)
+          to know if the fit is "good" */
+}
+void poly_accu(double *dx,double *coef ,int degree, int length){
+    int i=0;
+    for (i=0;i<length;i++){
+        double tmp_v=0.0;
+        for (int j=0;j<degree;j++){
+            tmp_v+=coef[j]*pow(dx[i],j);
+        }
+        dx[i]=tmp_v;
+    }
+}
 
 struct voted
 {
@@ -219,7 +270,7 @@ int main(int argc ,char* argv[]){
 
         int control=0;
         std::default_random_engine dre(time(NULL));
-        for  (control=0;control<n_iteration-1;control++){//在每次control中，完成iteration_size的计算
+        for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
             //int local_start=control_struct[control][0]*dft_size_pow;//文件中，这次control的粒子的起始位置
@@ -552,7 +603,8 @@ int main(int argc ,char* argv[]){
 
         }
 
-        float poly_result[iteration_SIZE];
+        double poly_result[iteration_SIZE];
+        double poly_index[iteration_SIZE];
         for (i=0;i<iteration_SIZE;i++){
             for (j=0;j<n_iteration;j++){
                 poly_result[i]+=distributrion[j][i];
@@ -560,8 +612,23 @@ int main(int argc ,char* argv[]){
         }
         for (i=0;i<iteration_SIZE;i++){
             poly_result[i]=poly_result[i]/n_iteration;
+            poly_index[i] = i+1;
         }
+        int degrees = 9;
+        double coefs[degrees];
+
+
+        polynomialfit(iteration_SIZE,degrees,poly_index,poly_result,coefs);
+        poly_accu(poly_result,coefs,degrees,iteration_SIZE);
         //use R code to predict distribution here
+        //use gsl_poly to calculate the distri
+
+        //read pre-cal distribution from file
+        FILE *f_distri;
+        f_distri = fopen("testbin","rb");
+        //cal the diff between their
+
+
 }
 
         fclose(f);
