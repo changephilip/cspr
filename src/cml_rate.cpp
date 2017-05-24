@@ -7,57 +7,58 @@
 /// this program is used to predict differen rate particles distrubution
 /// rate generate randomly to observe our prediction
 ////////////////////////////////////////
-#include <gsl/gsl_multifit.h>
+//#include <gsl/gsl_multifit.h>
 #include <stdbool.h>
-bool polynomialfit(int obs, int degree,
-           double *dx, double *dy, double *store) /* n, p */
-{
-  gsl_multifit_linear_workspace *ws;
-  gsl_matrix *cov, *X;
-  gsl_vector *y, *c;
-  double chisq;
 
-  int i, j;
+//bool polynomialfit(int obs, int degree,
+//           double *dx, double *dy, double *store) /* n, p */
+//{
+//  gsl_multifit_linear_workspace *ws;
+//  gsl_matrix *cov, *X;
+//  gsl_vector *y, *c;
+//  double chisq;
 
-  X = gsl_matrix_alloc(obs, degree);
-  y = gsl_vector_alloc(obs);
-  c = gsl_vector_alloc(degree);
-  cov = gsl_matrix_alloc(degree, degree);
+//  int i, j;
 
-  for(i=0; i < obs; i++) {
-    for(j=0; j < degree; j++) {
-      gsl_matrix_set(X, i, j, pow(dx[i], j));
-    }
-    gsl_vector_set(y, i, dy[i]);
-  }
+//  X = gsl_matrix_alloc(obs, degree);
+//  y = gsl_vector_alloc(obs);
+//  c = gsl_vector_alloc(degree);
+//  cov = gsl_matrix_alloc(degree, degree);
 
-  ws = gsl_multifit_linear_alloc(obs, degree);
-  gsl_multifit_linear(X, y, c, cov, &chisq, ws);
+//  for(i=0; i < obs; i++) {
+//    for(j=0; j < degree; j++) {
+//      gsl_matrix_set(X, i, j, pow(dx[i], j));
+//    }
+//    gsl_vector_set(y, i, dy[i]);
+//  }
 
-  /* store result ... */
-  for(i=0; i < degree; i++)
-  {
-    store[i] = gsl_vector_get(c, i);
-  }
+//  ws = gsl_multifit_linear_alloc(obs, degree);
+//  gsl_multifit_linear(X, y, c, cov, &chisq, ws);
 
-  gsl_multifit_linear_free(ws);
-  gsl_matrix_free(X);
-  gsl_matrix_free(cov);
-  gsl_vector_free(y);
-  gsl_vector_free(c);
-  return true; /* we do not "analyse" the result (cov matrix mainly)
-          to know if the fit is "good" */
-}
-void poly_accu(double *dx,double *coef ,int degree, int length){
-    int i=0;
-    for (i=0;i<length;i++){
-        double tmp_v=0.0;
-        for (int j=0;j<degree;j++){
-            tmp_v+=coef[j]*pow(dx[i],j);
-        }
-        dx[i]=tmp_v;
-    }
-}
+//  /* store result ... */
+//  for(i=0; i < degree; i++)
+//  {
+//    store[i] = gsl_vector_get(c, i);
+//  }
+
+//  gsl_multifit_linear_free(ws);
+//  gsl_matrix_free(X);
+//  gsl_matrix_free(cov);
+//  gsl_vector_free(y);
+//  gsl_vector_free(c);
+//  return true; /* we do not "analyse" the result (cov matrix mainly)
+//          to know if the fit is "good" */
+//}
+//void poly_accu(double *dx,double *coef ,int degree, int length){
+//    int i=0;
+//    for (i=0;i<length;i++){
+//        double tmp_v=0.0;
+//        for (int j=0;j<degree;j++){
+//            tmp_v+=coef[j]*pow(dx[i],j);
+//        }
+//        dx[i]=tmp_v;
+//    }
+//}
 
 struct voted
 {
@@ -614,21 +615,46 @@ int main(int argc ,char* argv[]){
             poly_result[i]=poly_result[i]/n_iteration;
             poly_index[i] = i+1;
         }
+        /*
         int degrees = 9;
         double coefs[degrees];
 
 
         polynomialfit(iteration_SIZE,degrees,poly_index,poly_result,coefs);
         poly_accu(poly_result,coefs,degrees,iteration_SIZE);
+
+         */
+
         //use R code to predict distribution here
         //use gsl_poly to calculate the distri
 
         //read pre-cal distribution from file
+        double *std_poly_dis;
+        std_poly_dis = new double[iteration_SIZE*20];
+
         FILE *f_distri;
         f_distri = fopen("testbin","rb");
-        //cal the diff between their
 
-
+        fread(&std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
+        //cal the diff
+        //cluster has not libgsl,we may use distribution directly.
+        double diff_poly[20];
+        for (i=0;i<20;i++){
+            diff_poly[i]=0.0;
+            for (j=0;j<5000;j++){
+                diff_poly[i]+=pow(std_poly_dis[j+i*5000]-poly_result[j],2);
+            }
+        }
+        int predict_index=0;
+        double predict_tmp=diff_poly[0];
+        for (i=1;i<20;i++){
+            if(predict_tmp>diff_poly[i]){
+                predict_index=i;
+                predict_tmp = diff_poly[i];
+            }
+        }
+        fprintf(OUTFILE,"Predict-rate\tIn-fact-rate\n");
+        fprintf(OUTFILE,"%d\t%f\n",predict_index*5,rate);
 }
 
         fclose(f);
