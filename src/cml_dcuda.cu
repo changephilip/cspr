@@ -560,6 +560,30 @@ __global__ void huge_kernel(int ctrid,int *d_ctr1,int *d_ctr2,float *d_data,floa
     my_reduction_kernel2<<<1,1>>>(&d_p[gid*L],&d_pi[gid*L],&d_Svalue[ctrid+gid],&d_max_index[ctrid+gid],L);
 }
 
+__global__ void block_kernel(int ctrid,int *d_ctr1,int *d_ctr2,float *d_data,float *d_data_t,float *d_sum,float *d_mean,float *d_stdv,float *d_buffer,float *d_p,int *d_pi,float *d_Svalue,int *d_max_index,int N){
+    //do a pair of NCC in a block
+    //size=128*128,16 per thread
+    //use 1024 thread to calculate
+    //16 sdot needed to used first
+    //shared memory 1024 float and 1024 int
+    extern __shared__ float sp[1024];
+    extern __shared__ int si[1024];
+    float dot_result[16];
+    int index_a[16];
+    int index_b[16];
+    int globalblockid=gridDim.x*blockIdx.x;
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    dot_result[0]=cublasSdot(handle,L,,1,,1);
+    index_a[0]=threadIdx.x;
+    index_b[0]=threadIdx.y;
+
+
+}
+
+
+
+
 void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
     int c_size=N*(N-1)/2;
     int a,b;
