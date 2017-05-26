@@ -2,7 +2,7 @@
 #include <time.h>
 #include <sys/time.h>
 //#include <array>>
-#include <algorithm>
+#include <random>
 ////////////////////////////////////////
 /// this program is used to predict differen rate particles distrubution
 /// rate generate randomly to observe our prediction
@@ -171,9 +171,12 @@ int main(int argc ,char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-    srand((unsigned)time(NULL));
-    rateOfNoise=(rand() % (20-0+1))+ 0;
-    rate = rateOfNoise *5/100;
+//    srand((unsigned)time(NULL));
+    std::default_random_engine DRE((unsigned)time(NULL));
+    std::uniform_int_distribution<int> di(0,19);
+    rateOfNoise=di(DRE);
+//    rateOfNoise=(rand() % (20-0+1))+ 0;
+    rate = rateOfNoise *5.0/100.0;
 
     FILE *OUTFILE;
     OUTFILE=fopen(logfile,"a+");
@@ -270,7 +273,7 @@ int main(int argc ,char* argv[]){
 
 
         int control=0;
-        std::default_random_engine dre(time(NULL));
+        std::default_random_engine dre;
         for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
@@ -284,20 +287,20 @@ int main(int argc ,char* argv[]){
                 //初始化数据集
             long malloc_size=double_local_N*dft_size_pow;
             float *lineardft_matrix=new float[malloc_size];
-            std::random_shuffle(List_Particle,List_Particle+N_particles,dre);
+            std::shuffle(List_Particle,List_Particle+N_particles,dre);
             for (i=0;i<local_N;i++){
                 fseek(f,List_Particle[i]*dft_size_pow*sizeof(float),SEEK_SET);
                 fread(&lineardft_matrix[i*dft_size_pow],sizeof(float),dft_size_pow,f);
             }
             //读入Noise文件，将Noise文件乱序，取和local_N等量的噪音图像
 
-            std::random_shuffle(List_Noise,List_Noise+N_noise,dre);
+            std::shuffle(List_Noise,List_Noise+N_noise,dre);
             for (i=0;i<Noise_N;i++){
-                fseek(fnoise,List_Noise[i]*dft_size_power*sizeof(float),SEEK_SET);
+                fseek(fnoise,List_Noise[i]*dft_size_pow*sizeof(float),SEEK_SET);
                 fread(&lineardft_matrix[(local_N+i)*dft_size_pow],sizeof(float),dft_size_pow,fnoise);
             }
             fprintf(OUTFILE,"read finished\n");
-
+	    fprintf(OUTFILE,"rate %f\n",rate);
             //维护混合数据List，记录粒子信息,(？不需要维护局部表）
 //            int maintain_list[double_local_N];
             //局部粒子矩阵，不需要做粒子数据偏移，但对粒子的序号在输出时要做偏移
@@ -633,7 +636,7 @@ int main(int argc ,char* argv[]){
         std_poly_dis = new double[iteration_SIZE*20];
 
         FILE *f_distri;
-        f_distri = fopen("testbin","rb");
+        f_distri = fopen("/home/huangq02/qianjiaqiang/testbin","rb");
 
         fread(&std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
         //cal the diff
@@ -653,6 +656,7 @@ int main(int argc ,char* argv[]){
                 predict_tmp = diff_poly[i];
             }
         }
+	fclose(f_distri);
         fprintf(OUTFILE,"Predict-rate\tIn-fact-rate\n");
         fprintf(OUTFILE,"%d\t%f\n",predict_index*5,rate);
 }
@@ -668,7 +672,7 @@ int main(int argc ,char* argv[]){
 
 
         t_all_end=time(NULL);
-        printf("all time %dhour\n",(t_all_end-t_start)/3600);
+//        fprintf(OUTFILE,"all time %fhour\n",(t_all_end-t_start)/3600);
 
         return 0;
 }
