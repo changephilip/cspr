@@ -246,7 +246,7 @@ int main(int argc ,char* argv[]){
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
 	int Noise_N=iteration_SIZE*rate;
-        int n_iteration=3;
+        int n_iteration=1;
         int *distributrion[n_iteration];
         for (int t=0;t<n_iteration;t++){
             distributrion[t] = new int [iteration_SIZE];
@@ -636,12 +636,16 @@ int main(int argc ,char* argv[]){
         //use gsl_poly to calculate the distri
 
         //read pre-cal distribution from file
+        fprintf(OUTFILE,"R code here\n");
         double *std_poly_dis;
         std_poly_dis = new double[iteration_SIZE*20];
 
         FILE *f_distri;
         f_distri = fopen("/home/huangq02/qianjiaqiang/testbin","rb");
-
+        double test_double=0.0;
+        fread(&test_double,sizeof(double),1,f_distri);
+        fprintf(OUTFILE,"test_double\t%f\n",test_double);
+        rewind(f_distri);
         fread(&std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
         //cal the diff
         //cluster has not libgsl,we may use distribution directly.
@@ -663,6 +667,11 @@ int main(int argc ,char* argv[]){
 	fclose(f_distri);
         fprintf(OUTFILE,"Predict-rate\tIn-fact-rate\n");
         fprintf(OUTFILE,"%d\t%f\n",predict_index*5,rate);
+        delete[] std_poly_dis;
+        for (i=0;i<n_iteration;i++){
+            delete[] distributrion[i];
+        }
+        delete
 }
 
         fclose(f);
