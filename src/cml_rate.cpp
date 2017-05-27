@@ -646,16 +646,23 @@ int main(int argc ,char* argv[]){
         fread(&test_double,sizeof(double),1,f_distri);
         fprintf(OUTFILE,"test_double\t%f\n",test_double);
         rewind(f_distri);
-        fread(&std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
+	fprintf(OUTFILE,"line 649\n");
+        fread(std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
+	fprintf(OUTFILE,"line 651\n");
+
         //cal the diff
         //cluster has not libgsl,we may use distribution directly.
         double diff_poly[20];
+	fprintf(OUTFILE,"line 656\n");
+	
         for (i=0;i<20;i++){
             diff_poly[i]=0.0;
             for (j=0;j<5000;j++){
                 diff_poly[i]+=pow(std_poly_dis[j+i*5000]-poly_result[j],2);
             }
         }
+	fprintf(OUTFILE,"line 664\n");
+
         int predict_index=0;
         double predict_tmp=diff_poly[0];
         for (i=1;i<20;i++){
@@ -664,6 +671,8 @@ int main(int argc ,char* argv[]){
                 predict_tmp = diff_poly[i];
             }
         }
+	fprintf(OUTFILE,"line 674\n");
+
 	fclose(f_distri);
         fprintf(OUTFILE,"Predict-rate\tIn-fact-rate\n");
         fprintf(OUTFILE,"%d\t%f\n",predict_index*5,rate);
@@ -671,7 +680,6 @@ int main(int argc ,char* argv[]){
         for (i=0;i<n_iteration;i++){
             delete[] distributrion[i];
         }
-        delete
 }
 
         fclose(f);
