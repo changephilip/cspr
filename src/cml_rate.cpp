@@ -246,10 +246,10 @@ int main(int argc ,char* argv[]){
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
 	int Noise_N=iteration_SIZE*rate;
-        int n_iteration=20;
-        int *distributrion[20];
-        for (i=0;i<n_iteration;i++){
-            distributrion[i] = new int [iteration_SIZE];
+        int n_iteration=3;
+        int *distributrion[n_iteration];
+        for (int t=0;t<n_iteration;t++){
+            distributrion[t] = new int [iteration_SIZE];
         }
 	iteration_size=iteration_SIZE-Noise_N;
 //        int last_iteration=N%iteration_size;
@@ -273,7 +273,7 @@ int main(int argc ,char* argv[]){
 
 
         int control=0;
-        std::default_random_engine dre;
+        std::default_random_engine dre((unsigned)time(NULL));
         for  (control=0;control<n_iteration;control++){//在每次control中，完成iteration_size的计算
             //初始化cml矩阵
             int local_N=control_struct[control][1];//这次control中的粒子数量
@@ -608,16 +608,20 @@ int main(int argc ,char* argv[]){
         }
 
         double poly_result[iteration_SIZE];
-        double poly_index[iteration_SIZE];
+//        double poly_index[iteration_SIZE];
+        //you need initialize
         for (i=0;i<iteration_SIZE;i++){
+            poly_result[i]=0.0;
             for (j=0;j<n_iteration;j++){
                 poly_result[i]+=distributrion[j][i];
             }
         }
+        /*
         for (i=0;i<iteration_SIZE;i++){
             poly_result[i]=poly_result[i]/n_iteration;
             poly_index[i] = i+1;
         }
+        */
         /*
         int degrees = 9;
         double coefs[degrees];
