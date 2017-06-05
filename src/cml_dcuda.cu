@@ -21,8 +21,8 @@
 #include <algorithm>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-#define L 140
-#define L_power 19600
+#define L 128 
+#define L_power 16384
 
 using namespace std;
 typedef struct{
@@ -379,8 +379,6 @@ __global__ void parent_ncc_kernel(float *d_data,int *d_ctr_id1,int *d_ctr_id2,fl
     Sy[globalThreadID]=max_index_j;
     free(C3);
 }
-void stream_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
-}
 void wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
     //wrapper_kernel前应该完成，数据打包成一个长数组
     //设置控制矩阵
@@ -568,8 +566,8 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     //use 1024 thread to calculate
     //16 sdot needed to used first
     //shared memory 1024 float and 1024 int
-    extern __shared__ float sp[1024];
-    extern __shared__ int si[1024];
+    extern __shared__ float sp[];
+    extern __shared__ int si[];
 
     int i;
     float threadmax=0.0f;
@@ -582,10 +580,10 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     int image_a=d_ctr1[globalblockid];
     int image_b=d_ctr2[globalblockid];
     int globalthread=threadIdx.x+threadIdx.y*32;
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+//    cublasHandle_t handle;
+//    cublasCreate(&handle);
     //threadIdx.x,threadIdx.y
-    dot_result[0]=cublasSdot(handle,L,,1,,1);
+    //dot_result[0]=cublasSdot(handle,L,,1,,1);
     index_a[0]=threadIdx.x*4;
     index_b[0]=threadIdx.y*4;
 
@@ -638,24 +636,29 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     index[14]=index_b[14]*L+index_a[14];
     index[15]=index_b[15]*L+index_a[15];
 
-    dot_result[0]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[0]*L],1,d_data[image_b*L_power+index_b[0]*L],1);
-    dot_result[1]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[1]*L],1,d_data[image_b*L_power+index_b[1]*L],1);
-    dot_result[2]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[2]*L],1,d_data[image_b*L_power+index_b[2]*L],1);
-    dot_result[3]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[3]*L],1,d_data[image_b*L_power+index_b[3]*L],1);
-    dot_result[4]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[4]*L],1,d_data[image_b*L_power+index_b[4]*L],1);
-    dot_result[5]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[5]*L],1,d_data[image_b*L_power+index_b[5]*L],1);
-    dot_result[6]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[6]*L],1,d_data[image_b*L_power+index_b[6]*L],1);
-    dot_result[7]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[7]*L],1,d_data[image_b*L_power+index_b[7]*L],1);
-    dot_result[8]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[8]*L],1,d_data[image_b*L_power+index_b[8]*L],1);
-    dot_result[9]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[9]*L],1,d_data[image_b*L_power+index_b[9]*L],1);
-    dot_result[10]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[10]*L],1,d_data[image_b*L_power+index_b[10]*L],1);
-    dot_result[11]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[11]*L],1,d_data[image_b*L_power+index_b[11]*L],1);
-    dot_result[12]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[12]*L],1,d_data[image_b*L_power+index_b[12]*L],1);
-    dot_result[13]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[13]*L],1,d_data[image_b*L_power+index_b[13]*L],1);
-    dot_result[14]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[14]*L],1,d_data[image_b*L_power+index_b[14]*L],1);
-    dot_result[15]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[15]*L],1,d_data[image_b*L_power+index_b[15]*L],1);
-
-    cublasDestroy(handle);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[0]*L],1,&d_data[image_b*L_power+index_b[0]*L],1,&dot_result[0]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[1]*L],1,&d_data[image_b*L_power+index_b[1]*L],1,&dot_result[1]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[2]*L],1,&d_data[image_b*L_power+index_b[2]*L],1,&dot_result[2]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[3]*L],1,&d_data[image_b*L_power+index_b[3]*L],1,&dot_result[3]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[4]*L],1,&d_data[image_b*L_power+index_b[4]*L],1,&dot_result[4]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[5]*L],1,&d_data[image_b*L_power+index_b[5]*L],1,&dot_result[5]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[6]*L],1,&d_data[image_b*L_power+index_b[6]*L],1,&dot_result[6]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[7]*L],1,&d_data[image_b*L_power+index_b[7]*L],1,&dot_result[7]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[8]*L],1,&d_data[image_b*L_power+index_b[8]*L],1,&dot_result[8]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[9]*L],1,&d_data[image_b*L_power+index_b[9]*L],1,&dot_result[9]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[10]*L],1,&d_data[image_b*L_power+index_b[10]*L],1,&dot_result[10]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[11]*L],1,&d_data[image_b*L_power+index_b[11]*L],1,&dot_result[11]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[12]*L],1,&d_data[image_b*L_power+index_b[12]*L],1,&dot_result[12]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[13]*L],1,&d_data[image_b*L_power+index_b[13]*L],1,&dot_result[13]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[14]*L],1,&d_data[image_b*L_power+index_b[14]*L],1,&dot_result[14]);
+//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[15]*L],1,&d_data[image_b*L_power+index_b[15]*L],1,&dot_result[15]);
+    for (i=0;i<16;i++){
+	dot_result[i]=0.0f;
+	for (int j=0;j<128;j++){
+		dot_result[i]+=d_data[image_a*L_power+index_a[j]*L+j]*d_data[image_b*L_power+index_b[i]*L+j];
+		}
+	}
+//    cublasDestroy(handle);
     //flambda
     for (i=0;i<16;i++){
     dot_result[i]=(dot_result[i]+L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]])/(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
@@ -678,7 +681,7 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
 
     __syncthreads();
 
-    for (int activethreads  = 1024 >>1;activeThreads>32;activethreads >>=1){
+    for (int activethreads  = 1024 >>1;activethreads>32;activethreads >>=1){
         if (globalthread < activethreads){
             sp[globalthread] = fmaxf(sp[globalthread],sp[globalthread+activethreads]);
             if (sp[globalthread]==sp[globalthread+activethreads]){
@@ -1067,7 +1070,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
     int *d_max_index;
     float *d_Svalue;
 
-    float *d_buffer;
+    //float *d_buffer;
 
 
     cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
@@ -1109,6 +1112,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
     dim3 dimGrid(a,b,1);
     dim3 dimBlock(32,32,1);
     unsigned int sharedsize= 1024*(sizeof(float)+sizeof(int));
+    printf("line 1110\n");
     block_kernel<<<dimGrid,dimBlock,sharedsize>>>(d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_Svalue,d_max_index);
 
     //for (int i=0;i<b;i++){
@@ -1118,7 +1122,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
     cudaDeviceSynchronize();
     cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
     cudaMemcpy(Svalue,d_Svalue,sizeof(float)*c_size,cudaMemcpyDeviceToHost);
-    cudaStreamDestroy(stream);
+    //cudaStreamDestroy(stream);
 
     int *ctr_L1;
     int *ctr_L2;
@@ -1404,7 +1408,7 @@ int main(int argc ,char* argv[]){
                     }
                 }
             }
-//		printf("703\n");
+		printf("703\n");
             t_start=time(NULL);
             //the fastest cpu version
             if (version == -1){
@@ -1421,7 +1425,7 @@ int main(int argc ,char* argv[]){
                         total_nccq[i][j] = new float[4];
                     }
                 }
-            //    printf("000005\n");
+                printf("000005\n");
 //                gettimeofday(&tsBegin,NULL);
                 for (i=0;i<double_local_N;i++){
             //        #pragma omp parallel for,can't openmp here
@@ -1469,11 +1473,11 @@ int main(int argc ,char* argv[]){
         Sy= new int [double_local_N*(double_local_N-1)/2];
         Svalue= new float [double_local_N*(double_local_N-1)/2];
 //                S = new cml_retstruc[double_local_N*(double_local_N-1)/2];
-//		printf("before enter wrappper\n");
+		printf("before enter wrappper\n");
 		t_ncc_gpu=time(NULL);
        //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
 //		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
-                huge_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
+//                huge_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 block_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
