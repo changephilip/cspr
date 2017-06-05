@@ -560,7 +560,9 @@ __global__ void huge_kernel(int ctrid,int *d_ctr1,int *d_ctr2,float *d_data,floa
     my_reduction_kernel2<<<1,1>>>(&d_p[gid*L],&d_pi[gid*L],&d_Svalue[ctrid+gid],&d_max_index[ctrid+gid],L);
 }
 
-__global__ void block_kernel(int ctrid,int *d_ctr1,int *d_ctr2,float *d_data,float *d_data_t,float *d_sum,float *d_mean,float *d_stdv,float *d_buffer,float *d_p,int *d_pi,float *d_Svalue,int *d_max_index,int N){
+__global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,float *d_mean,float *d_stdv,float *d_Svalue,int *d_max_index){
+    //blockid.x,.y->image_a,image_b;
+
     //do a pair of NCC in a block
     //size=128*128,16 per thread
     //use 1024 thread to calculate
@@ -568,20 +570,163 @@ __global__ void block_kernel(int ctrid,int *d_ctr1,int *d_ctr2,float *d_data,flo
     //shared memory 1024 float and 1024 int
     extern __shared__ float sp[1024];
     extern __shared__ int si[1024];
+
+    int i;
+    float threadmax=0.0f;
+    int threadindexmax=0;
     float dot_result[16];
     int index_a[16];
     int index_b[16];
-    int globalblockid=gridDim.x*blockIdx.x;
+    int index[16];
+    int globalblockid=blockIdx.x+blockDim.y*blockIdx.y;
+    int image_a=d_ctr1[globalblockid];
+    int image_b=d_ctr2[globalblockid];
+    int globalthread=threadIdx.x+threadIdx.y*32;
     cublasHandle_t handle;
     cublasCreate(&handle);
+    //threadIdx.x,threadIdx.y
     dot_result[0]=cublasSdot(handle,L,,1,,1);
-    index_a[0]=threadIdx.x;
-    index_b[0]=threadIdx.y;
+    index_a[0]=threadIdx.x*4;
+    index_b[0]=threadIdx.y*4;
+
+    index_a[1]=index_a[0]+1;
+    index_a[2]=index_a[0]+2;
+    index_a[3]=index_a[0]+3;
+    index_a[4]=index_a[0];
+    index_a[5]=index_a[0]+1;
+    index_a[6]=index_a[0]+2;
+    index_a[7]=index_a[0]+3;
+    index_a[8]=index_a[0];
+    index_a[9]=index_a[0]+1;
+    index_a[10]=index_a[0]+2;
+    index_a[11]=index_a[0]+3;
+    index_a[12]=index_a[0];
+    index_a[13]=index_a[0]+1;
+    index_a[14]=index_a[0]+2;
+    index_a[15]=index_a[0]+3;
+
+    index_b[1]=index_b[0]+1;
+    index_b[2]=index_b[0]+2;
+    index_b[3]=index_b[0]+3;
+    index_b[4]=threadIdx.y*4;
+    index_b[5]=index_b[0]+1;
+    index_b[6]=index_b[0]+2;
+    index_b[7]=index_b[0]+3;
+    index_b[8]=threadIdx.y*4;
+    index_b[9]=index_b[0]+1;
+    index_b[10]=index_b[0]+2;
+    index_b[11]=index_b[0]+3;
+    index_b[12]=threadIdx.y*4;
+    index_b[13]=index_b[0]+1;
+    index_b[14]=index_b[0]+2;
+    index_b[15]=index_b[0]+3;
+
+    index[0]=index_b[0]*L+index_a[0];
+    index[1]=index_b[1]*L+index_a[1];
+    index[2]=index_b[2]*L+index_a[2];
+    index[3]=index_b[3]*L+index_a[3];
+    index[4]=index_b[4]*L+index_a[4];
+    index[5]=index_b[5]*L+index_a[5];
+    index[6]=index_b[6]*L+index_a[6];
+    index[7]=index_b[7]*L+index_a[7];
+    index[8]=index_b[8]*L+index_a[8];
+    index[9]=index_b[9]*L+index_a[9];
+    index[10]=index_b[10]*L+index_a[10];
+    index[11]=index_b[11]*L+index_a[11];
+    index[12]=index_b[12]*L+index_a[12];
+    index[13]=index_b[13]*L+index_a[13];
+    index[14]=index_b[14]*L+index_a[14];
+    index[15]=index_b[15]*L+index_a[15];
+
+    dot_result[0]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[0]*L],1,d_data[image_b*L_power+index_b[0]*L],1);
+    dot_result[1]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[1]*L],1,d_data[image_b*L_power+index_b[1]*L],1);
+    dot_result[2]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[2]*L],1,d_data[image_b*L_power+index_b[2]*L],1);
+    dot_result[3]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[3]*L],1,d_data[image_b*L_power+index_b[3]*L],1);
+    dot_result[4]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[4]*L],1,d_data[image_b*L_power+index_b[4]*L],1);
+    dot_result[5]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[5]*L],1,d_data[image_b*L_power+index_b[5]*L],1);
+    dot_result[6]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[6]*L],1,d_data[image_b*L_power+index_b[6]*L],1);
+    dot_result[7]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[7]*L],1,d_data[image_b*L_power+index_b[7]*L],1);
+    dot_result[8]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[8]*L],1,d_data[image_b*L_power+index_b[8]*L],1);
+    dot_result[9]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[9]*L],1,d_data[image_b*L_power+index_b[9]*L],1);
+    dot_result[10]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[10]*L],1,d_data[image_b*L_power+index_b[10]*L],1);
+    dot_result[11]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[11]*L],1,d_data[image_b*L_power+index_b[11]*L],1);
+    dot_result[12]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[12]*L],1,d_data[image_b*L_power+index_b[12]*L],1);
+    dot_result[13]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[13]*L],1,d_data[image_b*L_power+index_b[13]*L],1);
+    dot_result[14]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[14]*L],1,d_data[image_b*L_power+index_b[14]*L],1);
+    dot_result[15]=cublasSdot(handle,L,d_data[image_a*L_power+index_a[15]*L],1,d_data[image_b*L_power+index_b[15]*L],1);
+
+    cublasDestroy(handle);
+    //flambda
+    for (i=0;i<16;i++){
+    dot_result[i]=(dot_result[i]+L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]])/(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
+    }
+//    dot_result[0]=(dot_result[0]+L*d_mean[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_sum[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_mean[image_a*L+index_a[0]]*d_sum[image_b*L+index_b[0]])/(L*d_stdv[image_a*L+index_a[0]]*d_stdv[image_b*L+index_b[0]]);
+
+
+    //cal the max of 16
+    threadmax=dot_result[0];
+    threadindexmax=index[0];
+    for (i=1;i<16;i++){
+        threadmax=fmaxf(threadmax,dot_result[i]);
+        if (threadmax==dot_result[i]){
+            threadindexmax=index[i];
+        }
+    }
+    sp[globalthread]=threadmax;
+    si[globalthread]=threadindexmax;
+
+
+    __syncthreads();
+
+    for (int activethreads  = 1024 >>1;activeThreads>32;activethreads >>=1){
+        if (globalthread < activethreads){
+            sp[globalthread] = fmaxf(sp[globalthread],sp[globalthread+activethreads]);
+            if (sp[globalthread]==sp[globalthread+activethreads]){
+                si[globalthread]=si[globalthread+activethreads];
+            }
+        }
+        __syncthreads();
+    }
+
+    if (globalthread<32){
+        volatile float *ws=sp;
+        volatile int *wi=si;
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+32]);
+        if (ws[globalthread]==ws[globalthread+32]){
+            wi[globalthread]=wi[globalthread+32];
+        }
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+16]);
+        if (ws[globalthread]==ws[globalthread+16]){
+            wi[globalthread]=wi[globalthread+16];
+        }
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+8]);
+        if (ws[globalthread]==ws[globalthread+8]){
+            wi[globalthread]=wi[globalthread+8];
+        }
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+4]);
+        if (ws[globalthread]==ws[globalthread+4]){
+            wi[globalthread]=wi[globalthread+4];
+        }
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+2]);
+        if (ws[globalthread]==ws[globalthread+2]){
+            wi[globalthread]=wi[globalthread+2];
+        }
+        ws[globalthread] = fmaxf(ws[globalthread],ws[globalthread+1]);
+        if (ws[globalthread]==ws[globalthread+1]){
+            wi[globalthread]=wi[globalthread+1];
+        }
+        if (globalthread==0){
+            volatile int *wi=si;
+            volatile float *ws=sp;
+            d_Svalue[globalblockid]=ws[0];
+            d_max_index[globalblockid]=wi[0];
+        }
+    }
+
+
 
 
 }
-
-
 
 
 void stream_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
@@ -869,6 +1014,134 @@ void huge_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,in
     cudaFree(d_Svalue);
     cudaFree(d_p);
     cudaFree(d_pi);
+    cudaFree(d_ctr_id1);
+    cudaFree(d_ctr_id2);
+    delete[] my_sum;
+    delete[] my_mean;
+    delete[] my_stdv;
+    delete[] ctr_id1;
+    delete[] ctr_id2;
+    delete[] max_index;
+
+}
+
+void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
+    int c_size=N*(N-1)/2;
+    int a,b;
+    if (N%2==0){
+        a=N-1;
+        b=N/2;
+    }
+    else {
+        a=N;
+        b=(N-1)/2;
+    }
+
+    float *my_sum;
+    float *my_mean;
+    float *my_stdv;
+    int *max_index;
+
+    max_index = new int [c_size];
+
+    my_sum = new float [N*L];
+    my_mean = new float [N*L];
+    my_stdv = new float [N*L];
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<L;j++){
+            my_sum[i*L+j]=help[i][j][0];
+            my_mean[i*L+j]=help[i][j][1];
+            my_stdv[i*L+j]=help[i][j][3];
+        }
+    }
+
+
+    float *d_data;
+    float *d_sum;
+    float *d_mean;
+    float *d_stdv;
+//    int *d_Sx;
+//    int *d_Sy;
+
+    int *d_max_index;
+    float *d_Svalue;
+
+    float *d_buffer;
+
+
+    cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
+
+    cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
+
+//    cudaMalloc((void **)&d_Sx,sizeof(int)*c_size);
+//    cudaMalloc((void **)&d_Sy,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_max_index,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
+
+    cudaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+
+//    int ctr_id1[c_size];
+//    int ctr_id2[c_size];
+    int *ctr_id1;
+    int *ctr_id2;
+    ctr_id1 = new int [c_size];
+    ctr_id2 = new int [c_size];
+    for (int i=0;i<N;i++){
+        for (int j=i+1;j<N;j++){
+            ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
+            ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
+        }
+    }
+    int *d_ctr_id1;
+    int *d_ctr_id2;
+
+    cudaMalloc((void **)&d_ctr_id1,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_ctr_id2,sizeof(int)*c_size);
+
+    cudaMemcpy(d_ctr_id1,ctr_id1,sizeof(int)*c_size,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_ctr_id2,ctr_id2,sizeof(int)*c_size,cudaMemcpyHostToDevice);
+    dim3 dimGrid(a,b,1);
+    dim3 dimBlock(32,32,1);
+    unsigned int sharedsize= 1024*(sizeof(float)+sizeof(int));
+    block_kernel<<<dimGrid,dimBlock,sharedsize>>>(d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_Svalue,d_max_index);
+
+    //for (int i=0;i<b;i++){
+//       huge_kernel<<<1,a,0,stream>>>(a*i,d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_buffer,d_p,d_pi,d_Svalue,d_max_index,L);
+
+//    }
+    cudaDeviceSynchronize();
+    cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Svalue,d_Svalue,sizeof(float)*c_size,cudaMemcpyDeviceToHost);
+    cudaStreamDestroy(stream);
+
+    int *ctr_L1;
+    int *ctr_L2;
+    ctr_L1 = new int [L_power];
+    ctr_L2 = new int [L_power];
+    for (int i=0;i<L;i++){
+        for (int j=0;j<L;j++){
+            ctr_L1[i*L+j]=i;
+            ctr_L2[i*L+j]=j;
+        }
+    }
+    for(int i=0;i<c_size;i++){
+        Sx[i] = ctr_L1[max_index[i]];
+        Sy[i] = ctr_L2[max_index[i]];
+    }
+    delete[] ctr_L1;
+    delete[] ctr_L2;
+    cudaFree(d_data);
+    cudaFree(d_sum);
+    cudaFree(d_mean);
+    cudaFree(d_stdv);
+    cudaFree(d_max_index);
+    cudaFree(d_Svalue);
     cudaFree(d_ctr_id1);
     cudaFree(d_ctr_id2);
     delete[] my_sum;
@@ -1201,7 +1474,7 @@ int main(int argc ,char* argv[]){
        //         wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
 //		stream_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 huge_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
-
+                block_wrapper_kernel(lineardft_matrix,double_local_N,dft_size,total_nccq,Sx,Sy,Svalue);
                 for (i=0;i<double_local_N;i++){
                     for (j=i+1;j<double_local_N;j++){
                         if (Svalue[(2*double_local_N-1-i)*i/2+j-(i+1)]>0.5){
