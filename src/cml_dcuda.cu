@@ -566,8 +566,8 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     //use 1024 thread to calculate
     //16 sdot needed to used first
     //shared memory 1024 float and 1024 int
-    extern __shared__ float sp[];
-    extern __shared__ int si[];
+    __shared__ float sp[1024];
+    __shared__ int si[1024];
 
     int i;
     float threadmax=0.0f;

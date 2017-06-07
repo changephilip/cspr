@@ -374,8 +374,8 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     //use 1024 thread to calculate
     //16 sdot needed to used first
     //shared memory 1024 float and 1024 int
-    extern __shared__ float sp[];
-    extern __shared__ int si[];
+    __shared__ float sp[1024];
+    __shared__ int si[1024];
 
     int i;
     float threadmax=0.0f;
@@ -411,20 +411,20 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     index_a[14]=index_a[0]+2;
     index_a[15]=index_a[0]+3;
 
-    index_b[1]=index_b[0]+1;
-    index_b[2]=index_b[0]+2;
-    index_b[3]=index_b[0]+3;
-    index_b[4]=threadIdx.y*4;
+    index_b[1]=index_b[0];
+    index_b[2]=index_b[0];
+    index_b[3]=index_b[0];
+    index_b[4]=index_b[0]+1;
     index_b[5]=index_b[0]+1;
-    index_b[6]=index_b[0]+2;
-    index_b[7]=index_b[0]+3;
-    index_b[8]=threadIdx.y*4;
-    index_b[9]=index_b[0]+1;
+    index_b[6]=index_b[0]+1;
+    index_b[7]=index_b[0]+1;
+    index_b[8]=index_b[0]+2;
+    index_b[9]=index_b[0]+2;
     index_b[10]=index_b[0]+2;
-    index_b[11]=index_b[0]+3;
-    index_b[12]=threadIdx.y*4;
-    index_b[13]=index_b[0]+1;
-    index_b[14]=index_b[0]+2;
+    index_b[11]=index_b[0]+2;
+    index_b[12]=index_b[0]+3;
+    index_b[13]=index_b[0]+3;
+    index_b[14]=index_b[0]+3;
     index_b[15]=index_b[0]+3;
 
     index[0]=index_b[0]*L+index_a[0];
@@ -462,15 +462,15 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
 //    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[15]*L],1,&d_data[image_b*L_power+index_b[15]*L],1,&dot_result[15]);
     for (i=0;i<16;i++){
 	dot_result[i]=0.0f;
-    for (int j=0;j<128;j++){
-        dot_result[i]+=d_data[image_a*L_power+index_a[i]*L+j]*d_data[image_b*L_power+index_b[i]*L+j];
-        }
+	    for (int j=0;j<128;j++){
+       		 dot_result[i]+=d_data[image_a*L_power+index_a[i]*L+j]*d_data[image_b*L_power+index_b[i]*L+j];
+        	}
 	}
 //    cublasDestroy(handle);
     //flambda
-    for (i=0;i<16;i++){
-    dot_result[i]=(dot_result[i]+L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]])/(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
-    }
+//    for (i=0;i<16;i++){
+//    dot_result[i]=(dot_result[i]+L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]])/(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
+//   }
 //    dot_result[0]=(dot_result[0]+L*d_mean[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_sum[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_mean[image_a*L+index_a[0]]*d_sum[image_b*L+index_b[0]])/(L*d_stdv[image_a*L+index_a[0]]*d_stdv[image_b*L+index_b[0]]);
 
 
@@ -627,7 +627,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
     dim3 dimBlock(32,32,1);
     unsigned int sharedsize= 1024*(sizeof(float)+sizeof(int));
     printf("line 1110\n");
-    block_kernel<<<dimGrid,dimBlock,sharedsize>>>(d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_Svalue,d_max_index);
+    block_kernel<<<dimGrid,dimBlock>>>(d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_Svalue,d_max_index);
 
     //for (int i=0;i<b;i++){
 //       huge_kernel<<<1,a,0,stream>>>(a*i,d_ctr_id1,d_ctr_id2,d_data,d_sum,d_mean,d_stdv,d_buffer,d_p,d_pi,d_Svalue,d_max_index,L);
