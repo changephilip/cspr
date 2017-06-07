@@ -20,7 +20,7 @@
 #define L 128 
 #define L_power 16384
 
-__global__ void test_block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,float *d_mean,float *d_stdv,float *d_Svalue,int *d_max_index){
+__global__ void test_block_kernel(float *d_data,float *d_Svalue,int *d_max_index){
     //blockid.x,.y->image_a,image_b;
 
     //do a pair of NCC in a block
@@ -39,8 +39,10 @@ __global__ void test_block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d
     int index_b[16];
     int index[16];
     int globalblockid=blockIdx.x+gridDim.y*blockIdx.y;
-    int image_a=d_ctr1[globalblockid];
-    int image_b=d_ctr2[globalblockid];
+//    int image_a=d_ctr1[globalblockid];
+//    int image_b=d_ctr2[globalblockid];
+    image_a=0;
+    image_b=0;
     int globalthread=threadIdx.x+threadIdx.y*32;
 //    cublasHandle_t handle;
 //    cublasCreate(&handle);
@@ -194,5 +196,34 @@ __global__ void test_block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d
 }
 
 int main(){
-    
+    float A[L_power];
+    for (int i=0;i<L_power;i++){
+        A[i]=i;
+    }
+    float *S_value;
+    int *max_index;
+    float *d_A;
+    float *d_sv;
+    float *d_index;
+    cudaMalloc((void **)&d_A,sizeof(float)*L_power);
+    cudaMalloc((void **)&d_sv,sizeof(float));
+    cudaMalloc((void **)&d_index,sizeof(int));
+    cudaMemcpy(d_A,A,sizeof(float)*L_power,cudaMemcpyHostToDevice);
+    dim3 dimBlock(32,32,1);
+    test_block_kernel<<<1,dimBlock>>>(A,d_sv,d_index);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(S_value,d_sv,sizeof(float),cudaMemcpyDeviceToHost);
+    cudaMemcpy(max_index,d_index,sizeof(float),cudaMemcpyDeviceToHost);
+
+    cudaFree(d_A);
+    cudaFree(d_sv);
+    cudaFree(d_index);
+
+    printf("svalue\t%f\n",S_value);
+    printf("maxindex\t%f\n",max_index);
+
+    return 0;
+
+
 }
