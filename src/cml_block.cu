@@ -16,7 +16,7 @@
 #include <cblas.h>
 #include <algorithm>
 #include <cuda_runtime.h>
-
+//#include <cublas_v2.h>
 #define L 128 
 #define L_power 16384
 
@@ -38,14 +38,15 @@ __global__ void test_block_kernel(float *d_data,float *d_Svalue,int *d_max_index
     int index_a[16];
     int index_b[16];
     int index[16];
-    int globalblockid=blockIdx.x+gridDim.y*blockIdx.y;
+    int globalblockid=0;
 //    int image_a=d_ctr1[globalblockid];
 //    int image_b=d_ctr2[globalblockid];
-    image_a=0;
-    image_b=0;
+    int image_a=0;
+    int image_b=0;
     int globalthread=threadIdx.x+threadIdx.y*32;
 //    cublasHandle_t handle;
 //    cublasCreate(&handle);
+//    cublasStatus_t status;
     //threadIdx.x,threadIdx.y
     //dot_result[0]=cublasSdot(handle,L,,1,,1);
     index_a[0]=threadIdx.x*4;
@@ -100,26 +101,42 @@ __global__ void test_block_kernel(float *d_data,float *d_Svalue,int *d_max_index
     index[14]=index_b[14]*L+index_a[14];
     index[15]=index_b[15]*L+index_a[15];
 
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[0]*L],1,&d_data[image_b*L_power+index_b[0]*L],1,&dot_result[0]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[1]*L],1,&d_data[image_b*L_power+index_b[1]*L],1,&dot_result[1]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[2]*L],1,&d_data[image_b*L_power+index_b[2]*L],1,&dot_result[2]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[3]*L],1,&d_data[image_b*L_power+index_b[3]*L],1,&dot_result[3]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[4]*L],1,&d_data[image_b*L_power+index_b[4]*L],1,&dot_result[4]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[5]*L],1,&d_data[image_b*L_power+index_b[5]*L],1,&dot_result[5]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[6]*L],1,&d_data[image_b*L_power+index_b[6]*L],1,&dot_result[6]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[7]*L],1,&d_data[image_b*L_power+index_b[7]*L],1,&dot_result[7]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[8]*L],1,&d_data[image_b*L_power+index_b[8]*L],1,&dot_result[8]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[9]*L],1,&d_data[image_b*L_power+index_b[9]*L],1,&dot_result[9]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[10]*L],1,&d_data[image_b*L_power+index_b[10]*L],1,&dot_result[10]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[11]*L],1,&d_data[image_b*L_power+index_b[11]*L],1,&dot_result[11]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[12]*L],1,&d_data[image_b*L_power+index_b[12]*L],1,&dot_result[12]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[13]*L],1,&d_data[image_b*L_power+index_b[13]*L],1,&dot_result[13]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[14]*L],1,&d_data[image_b*L_power+index_b[14]*L],1,&dot_result[14]);
-//    cublasSdot(handle,L,&d_data[image_a*L_power+index_a[15]*L],1,&d_data[image_b*L_power+index_b[15]*L],1,&dot_result[15]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[0]*L],1,&d_data[image_b*L_power+index_b[0]*L],1,&dot_result[0]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[1]*L],1,&d_data[image_b*L_power+index_b[1]*L],1,&dot_result[1]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[2]*L],1,&d_data[image_b*L_power+index_b[2]*L],1,&dot_result[2]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[3]*L],1,&d_data[image_b*L_power+index_b[3]*L],1,&dot_result[3]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[4]*L],1,&d_data[image_b*L_power+index_b[4]*L],1,&dot_result[4]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[5]*L],1,&d_data[image_b*L_power+index_b[5]*L],1,&dot_result[5]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[6]*L],1,&d_data[image_b*L_power+index_b[6]*L],1,&dot_result[6]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[7]*L],1,&d_data[image_b*L_power+index_b[7]*L],1,&dot_result[7]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[8]*L],1,&d_data[image_b*L_power+index_b[8]*L],1,&dot_result[8]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[9]*L],1,&d_data[image_b*L_power+index_b[9]*L],1,&dot_result[9]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[10]*L],1,&d_data[image_b*L_power+index_b[10]*L],1,&dot_result[10]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[11]*L],1,&d_data[image_b*L_power+index_b[11]*L],1,&dot_result[11]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[12]*L],1,&d_data[image_b*L_power+index_b[12]*L],1,&dot_result[12]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[13]*L],1,&d_data[image_b*L_power+index_b[13]*L],1,&dot_result[13]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[14]*L],1,&d_data[image_b*L_power+index_b[14]*L],1,&dot_result[14]);
+//    status=cublasSdot(handle,L,&d_data[image_a*L_power+index_a[15]*L],1,&d_data[image_b*L_power+index_b[15]*L],1,&dot_result[15]);
+//    float tmp_a[L];
+//    float tmp_b[L];
+//    for (i=0;i<16;i++){
+//	dot_result[i]=0.0f;
+//	for (int j=0;j<128;j++){
+//		tmp_a[j]=d_data[image_a*L_power+index_a[i]*L+j];
+//		}
+//	for (int j=0;j<128;j++){
+//		tmp_b[j]=d_data[image_b*L_power+index_b[i]*L+j];
+//		}
+//	for (int j=0;j<128;j++){
+//		dot_result[i]+=tmp_a[j]*tmp_b[j];
+//		}
+//	}
     for (i=0;i<16;i++){
 	dot_result[i]=0.0f;
 	    for (int j=0;j<128;j++){
        		 dot_result[i]+=d_data[image_a*L_power+index_a[i]*L+j]*d_data[image_b*L_power+index_b[i]*L+j];
+//		dot_result[i]=fmaf(d_data[image_a*L_power+index_a[i]*L+j],d_data[image_b*L_power+index_b[i]*L+j],dot_result[i]);
+
         	}
 	}
 //    cublasDestroy(handle);
@@ -200,28 +217,30 @@ int main(){
     for (int i=0;i<L_power;i++){
         A[i]=i;
     }
-    float *S_value;
-    int *max_index;
+    float S_value;
+    int max_index;
     float *d_A;
     float *d_sv;
-    float *d_index;
+    int  *d_index;
+    printf("208\n");
     cudaMalloc((void **)&d_A,sizeof(float)*L_power);
     cudaMalloc((void **)&d_sv,sizeof(float));
     cudaMalloc((void **)&d_index,sizeof(int));
     cudaMemcpy(d_A,A,sizeof(float)*L_power,cudaMemcpyHostToDevice);
     dim3 dimBlock(32,32,1);
-    test_block_kernel<<<1,dimBlock>>>(A,d_sv,d_index);
+    printf("209\n");
+    test_block_kernel<<<1,dimBlock>>>(d_A,d_sv,d_index);
     cudaDeviceSynchronize();
-
-    cudaMemcpy(S_value,d_sv,sizeof(float),cudaMemcpyDeviceToHost);
-    cudaMemcpy(max_index,d_index,sizeof(float),cudaMemcpyDeviceToHost);
+    printf("217\n");
+    cudaMemcpy(&S_value,d_sv,sizeof(float),cudaMemcpyDeviceToHost);
+    cudaMemcpy(&max_index,d_index,sizeof(float),cudaMemcpyDeviceToHost);
 
     cudaFree(d_A);
     cudaFree(d_sv);
     cudaFree(d_index);
-
+    printf("224\n");
     printf("svalue\t%f\n",S_value);
-    printf("maxindex\t%f\n",max_index);
+    printf("maxindex\t%d\n",max_index);
 
     return 0;
 

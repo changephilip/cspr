@@ -381,10 +381,11 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
     float threadmax=0.0f;
     int threadindexmax=0;
     float dot_result[16];
+    //float dot_result2[16];
     int index_a[16];
     int index_b[16];
     int index[16];
-    int globalblockid=blockIdx.x+gridDim.y*blockIdx.y;
+    int globalblockid=blockIdx.x+gridDim.x*blockIdx.y;
     int image_a=d_ctr1[globalblockid];
     int image_b=d_ctr2[globalblockid];
     int globalthread=threadIdx.x+threadIdx.y*32;
@@ -468,9 +469,10 @@ __global__ void block_kernel(int *d_ctr1,int *d_ctr2,float *d_data,float *d_sum,
 	}
 //    cublasDestroy(handle);
     //flambda
-//    for (i=0;i<16;i++){
-//    dot_result[i]=(dot_result[i]+L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]])/(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
-//   }
+    for (i=0;i<16;i++){
+    dot_result[i]+=(L*d_mean[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_sum[image_a*L+index_a[i]]*d_mean[image_b*L+index_b[i]]-d_mean[image_a*L+index_a[i]]*d_sum[image_b*L+index_b[i]]);
+	dot_result[i]/=(L*d_stdv[image_a*L+index_a[i]]*d_stdv[image_b*L+index_b[i]]);
+   }
 //    dot_result[0]=(dot_result[0]+L*d_mean[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_sum[image_a*L+index_a[0]]*d_mean[image_b*L+index_b[0]]-d_mean[image_a*L+index_a[0]]*d_sum[image_b*L+index_b[0]])/(L*d_stdv[image_a*L+index_a[0]]*d_stdv[image_b*L+index_b[0]]);
 
 
