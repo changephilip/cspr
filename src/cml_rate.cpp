@@ -173,10 +173,10 @@ int main(int argc ,char* argv[]){
 
 //    srand((unsigned)time(NULL));
     std::default_random_engine DRE((unsigned)time(NULL));
-    std::uniform_int_distribution<int> di(0,19);
+    std::uniform_int_distribution<int> di(0,99);
     rateOfNoise=di(DRE);
 //    rateOfNoise=(rand() % (20-0+1))+ 0;
-    rate = rateOfNoise *5.0/100.0;
+    rate = rateOfNoise *1.0/100.0;
 
     FILE *OUTFILE;
     OUTFILE=fopen(logfile,"a+");
@@ -246,7 +246,7 @@ int main(int argc ,char* argv[]){
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
 	int Noise_N=iteration_SIZE*rate;
-        int n_iteration=1;
+        int n_iteration=10;
         int *distributrion[n_iteration];
         for (int t=0;t<n_iteration;t++){
             distributrion[t] = new int [iteration_SIZE];
@@ -616,12 +616,12 @@ int main(int argc ,char* argv[]){
                 poly_result[i]+=distributrion[j][i];
             }
         }
-        /*
+        
         for (i=0;i<iteration_SIZE;i++){
             poly_result[i]=poly_result[i]/n_iteration;
-            poly_index[i] = i+1;
+       //     poly_index[i] = i+1;
         }
-        */
+        
         /*
         int degrees = 9;
         double coefs[degrees];
@@ -642,18 +642,18 @@ int main(int argc ,char* argv[]){
 
         FILE *f_distri;
         f_distri = fopen("/home/huangq02/qianjiaqiang/testbin","rb");
-        double test_double=0.0;
-        fread(&test_double,sizeof(double),1,f_distri);
-        fprintf(OUTFILE,"test_double\t%f\n",test_double);
-        rewind(f_distri);
-	fprintf(OUTFILE,"line 649\n");
+        //double test_double=0.0;
+        //fread(&test_double,sizeof(double),1,f_distri);
+        //fprintf(OUTFILE,"test_double\t%f\n",test_double);
+        //rewind(f_distri);
+	//fprintf(OUTFILE,"line 649\n");
         fread(std_poly_dis,sizeof(double),iteration_SIZE*20,f_distri);
-	fprintf(OUTFILE,"line 651\n");
+	//fprintf(OUTFILE,"line 651\n");
 
         //cal the diff
         //cluster has not libgsl,we may use distribution directly.
         double diff_poly[20];
-	fprintf(OUTFILE,"line 656\n");
+	//fprintf(OUTFILE,"line 656\n");
 	
         for (i=0;i<20;i++){
             diff_poly[i]=0.0;
@@ -661,7 +661,7 @@ int main(int argc ,char* argv[]){
                 diff_poly[i]+=pow(std_poly_dis[j+i*5000]-poly_result[j],2);
             }
         }
-	fprintf(OUTFILE,"line 664\n");
+	//fprintf(OUTFILE,"line 664\n");
 
         int predict_index=0;
         double predict_tmp=diff_poly[0];
@@ -671,7 +671,7 @@ int main(int argc ,char* argv[]){
                 predict_tmp = diff_poly[i];
             }
         }
-	fprintf(OUTFILE,"line 674\n");
+	//fprintf(OUTFILE,"line 674\n");
 
 	fclose(f_distri);
         fprintf(OUTFILE,"Predict-rate\tIn-fact-rate\n");
