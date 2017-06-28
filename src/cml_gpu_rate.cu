@@ -1635,7 +1635,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     delete[] data_Matrix;
     delete[] hist_Index;
     delete[] hist_Peak;
-    for (i=0;i<local_N;i++){
+    for (int i=0;i<local_N;i++){
         delete[] cml_Pair_Matrix[i];
     }
     time_End = time(NULL);
@@ -1689,7 +1689,7 @@ int main(int argc ,char* argv[]){
             printf("-s the particle size after dft and linear polar,default is 128(only 128 supported\n");
             printf("-n the number of particles\n");
             printf("-f the mrcs file which contains the particles data\n");
-            printf("-l your output filename,which will contain the particles,-l your output log file\n");
+            printf("-l your output filename,which will contain the particles,-o your output log file\n");
             printf("example\n");
             printf("cml_noise -s 128 -f ~/data/data.mrc -i 5 -l ~/output/particles -o ~/output/log\n");
             exit(EXIT_SUCCESS);
@@ -1719,12 +1719,12 @@ int main(int argc ,char* argv[]){
     FILE *OUTFILE;
     OUTFILE=fopen(logfile,"a+");
     fprintf(OUTFILE,"cml_size\t%d\n",cml_size);
-    fprintf(OUTFILE,"N\t%d\n",N);
+    //fprintf(OUTFILE,"N\t%d\n",N);
 
 //全局参数设定
     int dft_size=cml_size;
     int dft_size_pow=dft_size*dft_size;
-    int T;
+    //int T;
 //    T=72;
 //    int i,j,k;
 //    float sigma=180.0/float(T);
@@ -1785,7 +1785,7 @@ int main(int argc ,char* argv[]){
         int local_N=5000;
         for (int child=0;child<align_p/5000;child=child+1){
             List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow);
-            fprintf(log,"%d/%d completed\n",control_iteration,iteration);
+            fprintf(OUTFILE,"%d/%d completed\n",child,align_p/5000);
             }
         if (remain_p!=0){
          //do something
