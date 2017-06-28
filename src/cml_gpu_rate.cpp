@@ -1485,10 +1485,10 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     for (int i=0;i<local_N;i++){
         for (int j=0;j<dft_size;j++){
             long postion=i*dft_size_pow+j*dft_size;
-            total_nccq[i][j][0] = MYSUM(dft_size,&data_Matrix[postion]);//sum
-            total_nccq[i][j][1] = total_nccq[i][j][0] / dft_size;//mean
-            total_nccq[i][j][2] = cblas_sdot( dft_size, &lineardft_matrix[postion], 1,&lineardft_matrix[postion],1);//dot
-            total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + dft_size*total_nccq[i][j][1]*total_nccq[i][j][1] - 2*total_nccq[i][j][0]*total_nccq[i][j][1])/dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
+            pre_Ncc[i][j][0] = MYSUM(dft_size,&data_Matrix[postion]);//sum
+            pre_Ncc[i][j][1] = pre_Ncc[i][j][0] / dft_size;//mean
+            pre_Ncc[i][j][2] = cblas_sdot( dft_size, &data_Matrix[postion], 1,&data_Matrix[postion],1);//dot
+            pre_Ncc[i][j][3] = sqrt((pre_Ncc[i][j][2] + dft_size*pre_Ncc[i][j][1]*pre_Ncc[i][j][1] - 2*pre_Ncc[i][j][0]*pre_Ncc[i][j][1])/dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
         }
     }
     //give work to gpu
@@ -1564,7 +1564,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
                         }
                     }
                 }
-                hist_Peak[alpha_ij]=max_float(tmp_hist,T);
+                hist_Peak[alpha_ij]=max_float(tmp_Hist,T);
             }
             else{
             hist_Peak[alpha_ij]=0.0;
@@ -1587,14 +1587,14 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
 
     delete[] hist_Peak_Bak;
 
-    t_vote_2 =time(NULL);
+
     int Result_Voted[local_N];
     for (int i=0;i<local_N;i++){
         Result_Voted[i]=0;
     }
     //find high cml_pair
     for (int i=0;i<local_N;i++){
-        for (j=i+1;j<local_N;j++){
+        for (int j=i+1;j<local_N;j++){
             int index = (2*local_N-1-i)*i/2+j-(i+1);
             if (hist_Peak[index]>threshold){
                 Result_Voted[i]=Result_Voted[i]+1;
@@ -1706,10 +1706,10 @@ int main(int argc ,char* argv[]){
     if (!good_particle){
         printf("-l output file name 's abstract path is needed\n");
     }
-    if (N==-1 or cml_size==0){
-        printf("-n N and -s dft_cml_size are both needed,if N=0,then N=max\n");
-        exit(EXIT_FAILURE);
-    }
+//    if (N==-1 or cml_size==0){
+//        printf("-n N and -s dft_cml_size are both needed,if N=0,then N=max\n");
+//        exit(EXIT_FAILURE);
+//    }
     if (!logfile){
         printf("-o logfile is needed.\n");
         exit(EXIT_FAILURE);
@@ -1725,9 +1725,9 @@ int main(int argc ,char* argv[]){
     int dft_size=cml_size;
     int dft_size_pow=dft_size*dft_size;
     int T;
-    T=72;
+//    T=72;
 //    int i,j,k;
-    float sigma=180.0/float(T);
+//    float sigma=180.0/float(T);
     FILE *f;
     FILE *outputfile;
 //    FILE *fnoise;
@@ -1767,7 +1767,7 @@ int main(int argc ,char* argv[]){
     for (int i=0;i<N_particles;i++){
         List_Particle[i]=i;
     }
-    if （N_particles%5000==0){
+    if (N_particles%5000==0){
         remain_p=0;
         align_p=N_particles;
     }
@@ -1782,9 +1782,9 @@ int main(int argc ,char* argv[]){
         std::shuffle(List_Particle,List_Particle+align_p,dre);
         //先做align_p
         //准备工作
-        local_N=5000;
+        int local_N=5000;
         for (int child=0;child<align_p/5000;child=child+1){
-            List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow)
+            List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow);
             fprintf(log,"%d/%d completed\n",control_iteration,iteration);
             }
         if (remain_p!=0){
@@ -1809,7 +1809,7 @@ int main(int argc ,char* argv[]){
 
         fclose(f);
         fclose(outputfile);
-        fclose(fnoise);
+//        fclose(fnoise);
         fclose(OUTFILE);
 
 
