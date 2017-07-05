@@ -1796,10 +1796,16 @@ int main(int argc ,char* argv[]){
             for (int i=0;i<extra_Particles;i++){
                 extra_List[i]=List_Particle[i];
             }
+            /*
             for (int i=extra_Particles;i<local_N;i++){
                 extra_List[i]=List_Particle[i+align_p];
             }
+	    */
+	    for (int i=0;i<remain_p;i++){
+		extra_List[extra_Particles+i]=List_Particle[align_p+i];
+	    }
             List_wrapper(extra_List,f,OUTFILE,outputfile,dft_size,dft_size_pow);
+	    delete[] extra_List;
 
         }
 
