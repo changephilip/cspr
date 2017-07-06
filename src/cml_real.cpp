@@ -12,7 +12,7 @@ int main(int argc,char * argv[]){
     FILE *inmrc;
     FILE *outbin;
     double scale=cml_size/144.0;
-    const int SIZE_COMP=144;
+    const int SIZE_COMP=128;
 
     while ((oc = getopt(argc,argv,"s:i:o:")) != -1)
     {
@@ -79,7 +79,7 @@ int main(int argc,char * argv[]){
             MrcProcess::showimagecpp(image_mrc);
             MrcProcess::showimagecpp(lp_mrc);
         }
-
+		
 //        MrcProcess::showimagecpp(lpdft_mrc);
         float tmp_comp[SIZE_COMP*SIZE_COMP];
         cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
@@ -94,6 +94,30 @@ int main(int argc,char * argv[]){
                 l=l+1;
             }
 
+        }
+		cv::Size cutsize=cv::Size(SIZE_COMP-36,SIZE_COMP);
+//		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1);
+		float tmp_cut[SIZE_COMP][SIZE_COMP-36];
+		
+		for (j=0;j<SIZE_COMP;j++){
+			for (k=0;k<SIZE_COMP-36;k++){
+				tmp_cut[j][k]=lp_mrc.at<float>(j,k+36);
+			}
+		}
+		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
+		cv::resize(image_cut,image_comp,dsize);
+		CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
+        l=0;
+        for (j=0;j<SIZE_COMP;j++){
+            for (k=0;k<SIZE_COMP;k++){
+                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                l=l+1;
+            }
+
+        }
+        if (i==0 or i==5 or i==43){
+            MrcProcess::showimagecpp(image_cut);
+            MrcProcess::showimagecpp(image_comp);
         }
         fwrite(tmp_comp,sizeof(tmp_comp[0]),SIZE_COMP*SIZE_COMP,outbin);
 
@@ -128,6 +152,26 @@ int main(int argc,char * argv[]){
         cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
         cv::Mat image_comp=cv::Mat(dsize,CV_32FC1);
         cv::resize(lp_mrc,image_comp,dsize);
+        l=0;
+        for (j=0;j<SIZE_COMP;j++){
+            for (k=0;k<SIZE_COMP;k++){
+                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                l=l+1;
+            }
+
+        }
+		cv::Size cutsize=cv::Size(SIZE_COMP-36,SIZE_COMP);
+//		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1);
+		float tmp_cut[SIZE_COMP][SIZE_COMP-36];
+		
+		for (j=0;j<SIZE_COMP;j++){
+			for (k=0;k<SIZE_COMP-36;k++){
+				tmp_cut[j][k]=lp_mrc.at<float>(j,k+36);
+			}
+		}
+		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
+		cv::resize(image_cut,image_comp,dsize);
+		CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
         l=0;
         for (j=0;j<SIZE_COMP;j++){
             for (k=0;k<SIZE_COMP;k++){
