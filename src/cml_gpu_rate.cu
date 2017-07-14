@@ -1451,7 +1451,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
 
 }
 
-void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow){
+void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow,FILE *debug_f,FILE *hist_f){
     int time_Start,time_Readfile,time_Ncc,time_Voting,time_Sort,time_End;
 
     time_Start = time(NULL);
@@ -1500,9 +1500,15 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     Svalue= new float [local_N*(local_N-1)/2];
     stream_wrapper_2_kernel(data_Matrix,local_N,dft_size,pre_Ncc,Sx,Sy,Svalue);
     time_Ncc = time(NULL);
+    float *sysSvalue[local_N];
+    for (int i=0;i<local_N;i++){
+    	sysSvalue[i] = new float [local_N];
+	}
     //convert index
     for (int i=0;i<local_N;i++){
         for (int j=i+1;j<local_N;j++){
+	    sysSvalue[i][j]=Svalue[(2*local_N-1-i)*i/2+j-(i+1)];
+	    sysSvalue[j][i]=Svalue[(2*local_N-1-i)*i/2+j-(i+1)];
             if (Svalue[(2*local_N-1-i)*i/2+j-(i+1)]>0.5){
 //                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
 //                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
@@ -1516,6 +1522,17 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
             }
         }
     }
+//debug print s_value
+    for (int i=0;i<local_N;i++){
+	fprintf(debug_f,"%d\t",inList[i]);
+	for (int j=0;j<local_N;j++){
+		fprintf(debug_f,"%f\t",sysSvalue[i][j]);
+		}
+	fprintf(debug_f,"\n");
+	}
+    for (int i=0;i<local_N;i++){
+	delete[] sysSvalue[i];
+	}
     //clear memory won't be used
     delete[] Sx;
     delete[] Sy;
@@ -1592,6 +1609,20 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     for (int i=0;i<local_N;i++){
         Result_Voted[i]=0;
     }
+    //print out hist data
+    fprintf(hist_f,"*Vertices %d\n",local_N);
+    for (int i=0;i<local_N;i++){
+	 fprintf(hist_f," %d \"%d\"\n",i+1,i+1);
+	}
+    fprintf(hist_f,"*Arcs\n");
+    for (int i=0;i<local_N;i++){
+	for (int j=i+1;j<local_N;j++){
+		int index = (2*local_N-1-i)*i/2+j-(i+1);
+		if (hist_Peak[index]>threshold){
+			fprintf(hist_f," %d %d %f\n",j+1,i+1,1.0);
+			}
+		}
+   	 }
     //find high cml_pair
     for (int i=0;i<local_N;i++){
         for (int j=i+1;j<local_N;j++){
@@ -1622,7 +1653,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
                 counter=counter+1;
             }
             if ((i+1)%100==0){
-                fprintf(log,"%d\tconter %d\trate\t%f\n",i,counter,float(counter)/(i+1));
+                fprintf(log,"%d\tcounter %d\trate\t%f\n",i,counter,float(counter)/(i+1));
             }
         }
     }
@@ -1662,9 +1693,10 @@ int main(int argc ,char* argv[]){
     char* filename;
     char* good_particle;
     char* logfile;
-
+    char* debugfilename;
+    char* histfilename;
     printf("00001\n");
-    while((oc = getopt(argc, argv, "s:f:i:l:o:h")) != -1)
+    while((oc = getopt(argc, argv, "s:f:i:l:o:d:n:h")) != -1)
     {
         switch(oc)
         {
@@ -1683,6 +1715,12 @@ int main(int argc ,char* argv[]){
         case 'o':
             logfile=optarg;
             break;
+        case 'd':
+	    debugfilename=optarg;
+	    break;
+        case 'n':
+	    histfilename=optarg;
+	    break;
         case 'h':
             printf("CML_NONPART is a program that picks high quality particles and throw out non-particles\n");
             printf("Author:\tQian JiaQiang ,Fudan Univesity,15210700078@fudan.edu.cn\tHuangQiang Lab\n");
@@ -1730,17 +1768,24 @@ int main(int argc ,char* argv[]){
 //    float sigma=180.0/float(T);
     FILE *f;
     FILE *outputfile;
+    FILE *debugfile;
+    FILE *histfile;
 //    FILE *fnoise;
     char mybuf[1024];
     char mybuf2[1024];
-
+    char mybuf3[1024];
+    char mybuf4[1024];
 
     f=fopen(filename,"rb");
 
 
     outputfile=fopen(good_particle,"a+");
+    debugfile=fopen(debugfilename,"a+");
+    histfile=fopen(histfilename,"a+");
     setvbuf(outputfile,mybuf,_IOLBF,1024);
     setvbuf(OUTFILE,mybuf2,_IOLBF,1024);
+    setvbuf(debugfile,mybuf3,_IOLBF,1024);
+    setvbuf(histfile,mybuf4,_IOLBF,1024);
     long filelength;
     fseek(f,0,SEEK_END);
     filelength=ftell(f);
@@ -1783,8 +1828,13 @@ int main(int argc ,char* argv[]){
         //先做align_p
         //准备工作
         int local_N=5000;
+	//do test to use debug
+	///////////
+	align_p=5000;
+	remain_p=0;
+	///////////
         for (int child=0;child<align_p/5000;child=child+1){
-            List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow);
+            List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile);
             fprintf(OUTFILE,"%d/%d completed\n",child,align_p/5000);
             }
         if (remain_p!=0){
@@ -1804,7 +1854,7 @@ int main(int argc ,char* argv[]){
 	    for (int i=0;i<remain_p;i++){
 		extra_List[extra_Particles+i]=List_Particle[align_p+i];
 	    }
-            List_wrapper(extra_List,f,OUTFILE,outputfile,dft_size,dft_size_pow);
+            List_wrapper(extra_List,f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile);
 	    delete[] extra_List;
 
         }
@@ -1817,6 +1867,8 @@ int main(int argc ,char* argv[]){
         fclose(outputfile);
 //        fclose(fnoise);
         fclose(OUTFILE);
+	fclose(debugfile);
+        fclose(histfile);
 
 
 
