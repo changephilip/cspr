@@ -17,6 +17,7 @@ using namespace std;
 typedef struct{
     int x;
     int y;
+    float value;
 }cmlncv_tuple;
 namespace CMLNCV
 {

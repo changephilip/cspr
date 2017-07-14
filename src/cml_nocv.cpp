@@ -365,6 +365,7 @@ cmlncv_tuple NCC_QT(float **Qci,float **Qcj,float *Ci,float *Cj,int after_dft_si
                 value_ini = value[i][j];
                 ret.x=i;
                 ret.y=j;
+		ret.value=value_ini;
             }
 //            else break;
         }

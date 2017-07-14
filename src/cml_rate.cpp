@@ -91,6 +91,7 @@ int main(int argc ,char* argv[]){
     char* good_particle;
     char* logfile;
     char* noisefile;
+    char* debugfilename;
 //    char* directdiskfile;
     printf("00001\n");
     while((oc = getopt(argc, argv, "s:n:f:p:v:k:i:d:l:o:hN:")) != -1)
@@ -123,7 +124,8 @@ int main(int argc ,char* argv[]){
             iteration_SIZE=atoi(optarg);
             break;
         case 'd':
-            debug_flag=1;
+            //debug_flag=1;
+            debugfilename=optarg;
             break;
         case 'l':
             good_particle=optarg;
@@ -193,16 +195,18 @@ int main(int argc ,char* argv[]){
     FILE *f;
     FILE *outputfile;
     FILE *fnoise;
+    FILE *debugfile;
     char mybuf[1024];
     char mybuf2[1024];
-
+    char mybuf3[1024];
 //    f=fopen("/home/qjq/data/qjq_200_data","rb");
     f=fopen(filename,"rb");
     fnoise=fopen(noisefile,"rb");
-
+    debugfile=fopen(debugfilename,"a+");
     outputfile=fopen(good_particle,"a+");
     setvbuf(outputfile,mybuf,_IOLBF,1024);
     setvbuf(OUTFILE,mybuf2,_IOLBF,1024);
+    setvbuf(debugfile,mybuf3,_IOLBF,1024);
     long filelength;
     fseek(f,0,SEEK_END);
     filelength=ftell(f);
@@ -246,7 +250,7 @@ int main(int argc ,char* argv[]){
     if (iteration==1){
         //可以选择读取所有粒子数据到硬盘，也可以选择每次单独读取，先选择每次单独读取，节约内存资源
 	int Noise_N=iteration_SIZE*rate;
-        int n_iteration=10;
+        int n_iteration=1;
         int *distributrion[n_iteration];
         for (int t=0;t<n_iteration;t++){
             distributrion[t] = new int [iteration_SIZE];
@@ -371,12 +375,16 @@ int main(int argc ,char* argv[]){
                         total_nccq[i][j][3] = sqrt((total_nccq[i][j][2] + dft_size*total_nccq[i][j][1]*total_nccq[i][j][1] - 2*total_nccq[i][j][0]*total_nccq[i][j][1])/dft_size);//sigma=sqrt(dot+mean*mean*size-2*mean*sum)
                     }
                 }
-
+		float *svalue[double_local_N];
+		for (i=0;i<double_local_N;i++){
+			svalue[i] = new float[double_local_N];
+			}
                 for (i=0;i<double_local_N;i++){
                 #pragma omp parallel for
                     for (j=i+1;j<double_local_N;j++){
                         if (i==j){
                             cml_pair_matrix[i][j]=-1;
+			    svalue[i][j]=0;
                         }
                         else {
                             cmlncv_tuple tmp;
@@ -384,9 +392,28 @@ int main(int argc ,char* argv[]){
                             tmp=CMLNCV::NCC_QT(total_nccq[i],total_nccq[j],&lineardft_matrix[i*dft_size_pow],&lineardft_matrix[j*dft_size_pow],dft_size);
                             cml_pair_matrix[i][j]=tmp.x;
                             cml_pair_matrix[j][i]=tmp.y;
+			    svalue[i][j]=tmp.value;
+			    svalue[j][i]=tmp.value;
                         }
                     }
                 }
+		//write svalue to debugfile
+		for (i=0;i<double_local_N;i++){
+			if (i>local_N){
+				fprintf(debugfile,"N%d\t",i);
+				}
+			else{
+				fprintf(debugfile,"R%d\t",i);
+				}
+			for (j=0;j<double_local_N;j++){
+				fprintf(debugfile,"%f\t",svalue[i][j]);
+				}
+			fprintf(debugfile,"\n");
+			}
+		for (i=0;i<double_local_N;i++){
+			delete[] svalue[i];
+			}
+		
                 //NCC计算完成，所有common line被算出，释放计算辅助的数据存储矩阵
                 for (i=0;i<double_local_N;i++){
                     for (j=0;j<dft_size;j++){
