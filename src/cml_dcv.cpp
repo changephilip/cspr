@@ -132,7 +132,7 @@ int main(int argc,char **argv)
 
 
 
-        float half_pow_pi=sqrt(M_2_PI)*sigma;
+        float half_pow_pi=sqrt(2*M_PI)*sigma;
         for (i=0;i<hist_row;i++){
             for (j=0;j<N;j++){
                 float tmp=voting[i][j];
