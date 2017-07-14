@@ -244,7 +244,7 @@ if (version == -1){
         float *hist_peak =  new float[N*(N-1)/2];
         int *hist_index = new int[N*(N-1)/2];
 
-        float half_pow_pi=sqrt(M_2_PI)*sigma;
+        float half_pow_pi=sqrt(2*M_PI)*sigma;
 //combine the voting and peak
         for (i=0;i<N;i++){
             for (j=i+1;j<N;j++){

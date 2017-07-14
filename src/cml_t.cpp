@@ -326,11 +326,11 @@ float NCC0(float *cml1,float *cml2,int CML_SIZE){
 
 float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
-//    double two_pi=6.28318530;
+    double two_pi=2*M_PI;
     float cos_angleij,angleij;
-    a = cos((cmlkj-cmlki)*M_2_PI/float(after_dft_size));
-    b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
-    c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    a = cos((cmlkj-cmlki)*two_pi/float(after_dft_size));
+    b = cos((cmljk-cmlji)*two_pi/float(after_dft_size));
+    c = cos((cmlik-cmlij)*two_pi/float(after_dft_size));
     cos_angleij = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
     printf("\ncos_angle %f\n",cos_angleij);
     angleij = acos(cos_angleij);
@@ -339,11 +339,11 @@ float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int 
 
 bool voting_condition(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
-//    double two_pi=6.28318530;
+    double two_pi=2*M_PI;
 //    float cos_angleij,angleij;
-    a = cos((cmlkj-cmlki)*M_2_PI/float(after_dft_size));
-    b = cos((cmljk-cmlji)*M_2_PI/float(after_dft_size));
-    c = cos((cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    a = cos((cmlkj-cmlki)*two_pi/float(after_dft_size));
+    b = cos((cmljk-cmlji)*two_pi/float(after_dft_size));
+    c = cos((cmlik-cmlij)*two_pi/float(after_dft_size));
     if ((1+2*a*b*c)>a*a+b*b+c*c) {
         return TRUE;
     }
