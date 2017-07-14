@@ -137,11 +137,11 @@ float BNCC(const float *cml1,const float *cml2,int CML_SIZE){
 
 float cal_angle(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,int after_dft_size){
     double a,b,c;
-//    double two_pi=6.28318530;
+    double two_pi=2*M_PI;
     float cos_angleij,angleij;
-    a = cos(float(cmlkj-cmlki)*M_2_PI/float(after_dft_size));
-    b = cos(float(cmljk-cmlji)*M_2_PI/float(after_dft_size));
-    c = cos(float(cmlik-cmlij)*M_2_PI/float(after_dft_size));
+    a = cos(float(cmlkj-cmlki)*two_pi/float(after_dft_size));
+    b = cos(float(cmljk-cmlji)*two_pi/float(after_dft_size));
+    c = cos(float(cmlik-cmlij)*two_pi/float(after_dft_size));
     cos_angleij = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
 //    printf("\ncos_angle %f\n",cos_angleij);
     angleij = acos(cos_angleij);

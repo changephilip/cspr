@@ -264,8 +264,9 @@ int main(int argc ,char* argv[]){
 
             float *hist_peak =  new float[local_N*(local_N-1)/2];
             int *hist_index = new int[local_N*(local_N-1)/2];
-            float half_pow_pi=sqrt(M_2_PI)*sigma;
-            float four_sigma_pow=4*sigma*sigma;
+            float half_pow_pi=sqrt(2*M_PI)*sigma;
+//            float four_sigma_pow=4*sigma*sigma;
+            float two_sigma_pow=2*sigma*sigma;
             //开始voting算法，先计算一遍voting，算出hist数组、hist_index数组
 
             //combine the voting and peak
@@ -291,7 +292,7 @@ int main(int argc ,char* argv[]){
             #pragma omp parallel for
                                     for (int l=0;l<T;l++){
                                         float alpha_t_alpha12=(180.0*l/float(T))-tmp;
-                                        tmp_hist[l]=tmp_hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/(four_sigma_pow))/half_pow_pi;
+                                        tmp_hist[l]=tmp_hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/(two_sigma_pow))/half_pow_pi;
                                     }
                                 }
                             }

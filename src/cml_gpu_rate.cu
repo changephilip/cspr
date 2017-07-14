@@ -1550,9 +1550,10 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     float sigma=180.0/T;
     float *hist_Peak =  new float[local_N*(local_N-1)/2];
     int *hist_Index = new int[local_N*(local_N-1)/2];
-    float half_pow_pi=sqrt(M_2_PI)*sigma;
-    float four_sigma_pow=4*sigma*sigma;
-    float cons=M_2_PI/dft_size;
+    float half_pow_pi=sqrt(2*M_PI)*sigma;
+//    float four_sigma_pow=4*sigma*sigma;
+    float two_sigma_pow=2*sigma*sigma;
+    float cons=2*M_PI/dft_size;
     float Trecurse=180.0/T;
     //voting core
     for (int i=0;i<local_N;i++){
@@ -1577,7 +1578,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
 #pragma omp parallel for
                         for (int l=0;l<T;l++){
                             float alpha_t_alpha12=Trecurse*l-tmp;
-                            tmp_Hist[l]=tmp_Hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/four_sigma_pow)/half_pow_pi;
+                            tmp_Hist[l]=tmp_Hist[l]+exp(-1.0*alpha_t_alpha12*alpha_t_alpha12/two_sigma_pow)/half_pow_pi;
                         }
                     }
                 }
