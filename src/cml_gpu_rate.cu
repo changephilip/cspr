@@ -1504,12 +1504,29 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     for (int i=0;i<local_N;i++){
     	sysSvalue[i] = new float [local_N];
 	}
+    int ncc_filter=1;
+    float ncc_threshold=0.5f;
+    while (ncc_filter){
+	float *svalue_bak;
+	int r=8;
+	long svalue_size=local_N*(local_N-1)/2;
+	svalue_bak = new float[local_N*(local_N-1)/2];
+    	int threshold_Top=floor((1-(r/sqrt(local_N)))*svalue_size);
+    	for (int i=0;i<svalue_size;i++){
+		svalue_bak[i] = Svalue[i];
+		}
+	sort(svalue_bak,svalue_bak+svalue_size);
+	ncc_threshold = svalue_bak[threshold_Top-1];
+	delete[] svalue_bak;
+	}
+	
     //convert index
     for (int i=0;i<local_N;i++){
         for (int j=i+1;j<local_N;j++){
 	    sysSvalue[i][j]=Svalue[(2*local_N-1-i)*i/2+j-(i+1)];
 	    sysSvalue[j][i]=Svalue[(2*local_N-1-i)*i/2+j-(i+1)];
-            if (Svalue[(2*local_N-1-i)*i/2+j-(i+1)]>0.5){
+//            if (Svalue[(2*local_N-1-i)*i/2+j-(i+1)]>0.5){
+	    if (Svalue[(2*local_N-1-i)*i/2+j-(i+1)]>ncc_threshold){
 //                        cml_pair_matrix_help[i][j]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].x;
 //                        cml_pair_matrix_help[j][i]=S[(2*double_local_N-1-i)*i/2+j-(i+1)].y;
             cml_Pair_Matrix[i][j]=Sx[(2*local_N-1-i)*i/2+j-(i+1)];
@@ -1524,11 +1541,11 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     }
 //debug print s_value
     for (int i=0;i<local_N;i++){
-	fprintf(debug_f,"%d\t",inList[i]);
+//	fprintf(debug_f,"%d\t",inList[i]);
 	for (int j=0;j<local_N;j++){
-		fprintf(debug_f,"%f\t",sysSvalue[i][j]);
+//		fprintf(debug_f,"%f\t",sysSvalue[i][j]);
 		}
-	fprintf(debug_f,"\n");
+//	fprintf(debug_f,"\n");
 	}
     for (int i=0;i<local_N;i++){
 	delete[] sysSvalue[i];
@@ -1591,7 +1608,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     }
     time_Voting = time(NULL);
     //get voted_value
-    int r=4;
+    int r=8;
 
     float *hist_Peak_Bak = new float[local_N*(local_N-1)/2];
     long hist_Peak_Size = local_N*(local_N-1)/2;
@@ -1613,14 +1630,14 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     //print out hist data
     fprintf(hist_f,"*Vertices %d\n",local_N);
     for (int i=0;i<local_N;i++){
-	 fprintf(hist_f," %d \"%d\"\n",i+1,i+1);
+//	 fprintf(hist_f," %d \"%d\"\n",i+1,i+1);
 	}
     fprintf(hist_f,"*Arcs\n");
     for (int i=0;i<local_N;i++){
 	for (int j=i+1;j<local_N;j++){
 		int index = (2*local_N-1-i)*i/2+j-(i+1);
 		if (hist_Peak[index]>threshold){
-			fprintf(hist_f," %d %d %f\n",j+1,i+1,1.0);
+//			fprintf(hist_f," %d %d %f\n",j+1,i+1,1.0);
 			}
 		}
    	 }
@@ -1831,8 +1848,8 @@ int main(int argc ,char* argv[]){
         int local_N=5000;
 	//do test to use debug
 	///////////
-	align_p=5000;
-	remain_p=0;
+	//align_p=5000;
+	//remain_p=0;
 	///////////
         for (int child=0;child<align_p/5000;child=child+1){
             List_wrapper(&List_Particle[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile);
