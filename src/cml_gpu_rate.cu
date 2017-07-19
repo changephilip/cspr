@@ -1506,9 +1506,9 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
 	}
     int ncc_filter=1;
     float ncc_threshold=0.5f;
-    while (ncc_filter){
+    if (ncc_filter){
 	float *svalue_bak;
-	int r=8;
+	int r=4;
 	long svalue_size=local_N*(local_N-1)/2;
 	svalue_bak = new float[local_N*(local_N-1)/2];
     	int threshold_Top=floor((1-(r/sqrt(local_N)))*svalue_size);
@@ -1663,7 +1663,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
 
     time_Sort = time(NULL);
     //if noise is known
-    while (0){
+    if (0==1){
         int num_Noise = 1;//as noise_flag
         int counter=0;
         for (int i=0;i<local_N;i++){
