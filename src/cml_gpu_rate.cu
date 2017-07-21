@@ -1,4 +1,3 @@
-
 //#include "cml_nocv.h"
 //#include "cml_cuda.h"
 //#include "cml_cuda.cu"
@@ -1451,7 +1450,7 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
 
 }
 
-void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow,FILE *debug_f,FILE *hist_f){
+void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow,FILE *debug_f,FILE *hist_f,std::vector<voted> good_Particle){
     int time_Start,time_Readfile,time_Ncc,time_Voting,time_Sort,time_End;
 
     time_Start = time(NULL);
@@ -1680,6 +1679,13 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     for (int i=0;i<local_N;i++){
         fprintf(particle_log,"%d\t%d\t%d\n",i,inList[V[i].index],V[i].value);
     }
+    //write good particle in global_good_particle
+    for (int i=0;i<local_N;i++){
+        voted tmp;
+        tmp.index=inList[V[i]];
+        tmp.value=V[i].value;
+        good_Particle.push_back(tmp);
+    }
     //free memory
     delete[] data_Matrix;
     delete[] hist_Index;
@@ -1840,6 +1846,7 @@ int main(int argc ,char* argv[]){
             }
     //全列表随机
     std::shuffle(List_Particle,List_Particle+N_particles,dre);
+
     for (int control_iteration=iteration;control_iteration>0;control_iteration=control_iteration-1){
         //随机列表靠前5000*n部分
         std::shuffle(List_Particle,List_Particle+align_p,dre);
@@ -1880,12 +1887,100 @@ int main(int argc ,char* argv[]){
 
 }
 
+    ///////////////
+    ///we use a complex and recursive method to achieve high-quality particles
+    ///////////////
+    //全部粒子vector
+    std::vector<int> Global_Particle(List_Particle,List_Particle+sizeof(List_Particle)/sizeof(*List_Particle));
+    //筛选出的vector
+    std::vector<int> Global_Good_Particle;
 
+    for (int control_iteration=iteration;control_iteration>0;control_iteration=control_iteration-1){
+        int local_N=5000;
+        //构建局部粒子列表
+        int List_Current[N_particles-Global_Good_Particle.size()];
+        std::vector<int> Particle_Current;
+        for (int x : Global_Particle){
+            std::vector<int>::iterator iter=std::find(Global_Good_Particle.begin(),Global_Good_Particle.end(),x);
+            if (iter!=Global_Good_Particle.end()){
+                Particle_Current.push_back(x);
+            }
+        }
+        for (i=0;i<Particle_Current.size();i++){
+            List_Current[i]=Particle_Current[i];
+        }
+        int Current_Align_P,Current_Remain_P;
+        if (Particle_Current.size()%5000==0){
+            Current_Remain_P=0;
+            Current_Align_P=Particle_Current.size();
+        }
+        else {
+                Current_Remain_P=Particle_Current.size()%5000;
+                Current_Align_P=Particle_Current.size()-Current_Remain_P;
+                }
+        //随机align部分粒子
+        std::shuffle(List_Current,List_Current+Current_Align_P,dre);
+        //start
+        std::vector<voted> this_turn;
+        for (int child=0;child<Current_Align_P/5000;child=child+1){
+            List_wrapper(&List_Current[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile,this_turn);
+            fprintf(OUTFILE,"%d/%d completed\n",child,align_p/5000);
+            }
+        if (Current_Remain_P!=0){
+         //do something
+            int extra_Particles = local_N - Current_Remain_P;
+            //construct a new list
+            int *extra_List;
+            extra_List = new int [local_N];
+            for (int i=0;i<extra_Particles;i++){
+                extra_List[i]=List_Current[i];
+            }
+            for (int i=0;i<Current_Remain_P;i++){
+                extra_List[extra_Particles+i]=List_Current[Current_Align_P+i];
+            }
+            List_wrapper(extra_List,f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile,this_turn);
+            delete[] extra_List;
+        }
+        //see this_turn
+        float *score=new float[Particle_Current.size()];
+        int *score_counter=new int [Particle_Current.size()];
+        std::fill(score,score+Particle_Current.size(),-1.0f);
+        std::fill(score,score+Particle_Current.size(),0);
+        for (auto x : this_turn){
+            score[x.index]+=x.value;
+            score_counter+=1;
+        }
+        for (int i=0;i<Particle_Current.size();i++){
+            score[i]=score[i]/float(score_counter[i]);
+        }
+        std::vector<voted> V;
+        for (int i=0;i<Particle_Current.size();i++){
+            voted s;
+            s.index=i;
+            s.value=score[i];
+            V.push_back(s);
+        }
+        std::sort(V.begin(),V.end(),comp);
+        float rate=Particle_Current.size()-0.05*Particle_Current.size();
+        for (int i=0;i<Particle_Current.size();i++){
+            if (i>rate){
+                Global_Good_Particle.push_back(V[i].index);
+            }
+        }
+        fprintf(OUTFILE,"iteration\t%d\tcompleted\n",control_iteration);
+        //need some other code
+
+    }
+    fprintf(OUTFILE,"Get Particles\n");
+    for (auto x: Global_Good_Particle){
+        fprintf(OUTFILE,"%d\n");
+    }
+    ///////////////
         fclose(f);
         fclose(outputfile);
 //        fclose(fnoise);
         fclose(OUTFILE);
-	fclose(debugfile);
+        fclose(debugfile);
         fclose(histfile);
 
 
