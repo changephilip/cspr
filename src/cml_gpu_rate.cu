@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <map>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -1947,24 +1948,30 @@ int main(int argc ,char* argv[]){
             delete[] extra_List;
         }
         //see this_turn
-        float *score=new float[Particle_Current.size()];
-        int *score_counter=new int [Particle_Current.size()];
-        std::fill(score,score+Particle_Current.size(),0.0f);
-        std::fill(score,score+Particle_Current.size(),0);
+
+        std::map<int,float> score_countainer;
+        std::map<int,int> score_counter;
+        //initial map
+        for (auto x : Particle_Current){
+            score_countainer[x]=0.0f;
+            score_counter[x]=0;
+        }
         for (auto x : this_turn){
-            score[x.index]+=x.value;
+            score_countainer[x.index]+=x.value;
             score_counter[x.index]+=1;
         }
-        for (int i=0;i<Particle_Current.size();i++){
-            score[i]=score[i]/float(score_counter[i]);
+        for (auto x : Particle_Current){
+            score_countainer[x]=score_countainer[x]/score_counter[x];
         }
+
         std::vector<voted> V;
-        for (int i=0;i<Particle_Current.size();i++){
+        for (auto x : Particle_Current){
             voted s;
-            s.index=i;
-            s.value=score[i];
+            s.index=x;
+            s.value=score_countainer[x];
             V.push_back(s);
         }
+
         std::sort(V.begin(),V.end(),comp);
         float rate=Particle_Current.size()-0.05*Global_Particle.size();
         for (int i=0;i<Particle_Current.size();i++){
@@ -1974,10 +1981,9 @@ int main(int argc ,char* argv[]){
         }
         fprintf(OUTFILE,"iteration\t%d\tcompleted\n",control_iteration);
         //need some other code
-	delete[] score;
-	delete[] score_counter;
 
     }
+
     fprintf(OUTFILE,"Get Particles\n");
     for (auto x: Global_Good_Particle){
         fprintf(OUTFILE,"%d\n",x);
