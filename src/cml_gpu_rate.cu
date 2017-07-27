@@ -1456,6 +1456,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     printf("in List_wrapper\n");
     time_Start = time(NULL);
     //standard cal unit
+    //int local_N=5000;
     int local_N=5000;
     //allocate memory
     int *cml_Pair_Matrix[local_N];
@@ -1609,7 +1610,7 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     }
     time_Voting = time(NULL);
     //get voted_value
-    int r=8;
+    int r=4;
 
     float *hist_Peak_Bak = new float[local_N*(local_N-1)/2];
     long hist_Peak_Size = local_N*(local_N-1)/2;
@@ -1896,29 +1897,36 @@ int main(int argc ,char* argv[]){
     printf("%ld\n",Global_Particle.size());
     //筛选出的vector
     std::vector<int> Global_Good_Particle;
-
+    std::vector<int> Global_Bad_Particle;
     for (int control_iteration=iteration;control_iteration>0;control_iteration=control_iteration-1){
-        int local_N=5000;
+        //int local_N=5000;
+	int local_N=5000;
         //构建局部粒子列表
         int List_Current[N_particles-Global_Good_Particle.size()];
-	printf("List_Current %d\n",N_particles-Global_Good_Particle.size());
+	printf("List_Current %ld\n",N_particles-Global_Good_Particle.size());
         std::vector<int> Particle_Current;
         for (int x : Global_Particle){
+	    /*
             std::vector<int>::iterator iter=std::find(Global_Good_Particle.begin(),Global_Good_Particle.end(),x);
             if (iter==Global_Good_Particle.end()){
                 Particle_Current.push_back(x);
             }
+	    */
+	    std::vector<int>::iterator iter=std::find(Global_Bad_Particle.begin(),Global_Bad_Particle.end(),x);
+	    if (iter==Global_Bad_Particle.end()){
+		Particle_Current.push_back(x);
+	    }
         }
         for (int i=0;i<Particle_Current.size();i++){
             List_Current[i]=Particle_Current[i];
         }
         int Current_Align_P,Current_Remain_P;
-        if (Particle_Current.size()%5000==0){
+        if (Particle_Current.size()%local_N==0){
             Current_Remain_P=0;
             Current_Align_P=Particle_Current.size();
         }
         else {
-                Current_Remain_P=Particle_Current.size()%5000;
+                Current_Remain_P=Particle_Current.size()%local_N;
                 Current_Align_P=Particle_Current.size()-Current_Remain_P;
                 }
 	printf("before List_wrapper\n");
@@ -1928,9 +1936,9 @@ int main(int argc ,char* argv[]){
         std::shuffle(List_Current,List_Current+Current_Align_P,dre);
         //start
         std::vector<voted> this_turn;
-        for (int child=0;child<Current_Align_P/5000;child=child+1){
-            List_wrapper(&List_Current[child*5000],f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile,this_turn);
-            fprintf(OUTFILE,"%d/%d completed\n",child,Current_Align_P/5000);
+        for (int child=0;child<Current_Align_P/local_N;child=child+1){
+            List_wrapper(&List_Current[child*local_N],f,OUTFILE,outputfile,dft_size,dft_size_pow,debugfile,histfile,this_turn);
+            fprintf(OUTFILE,"%d/%d completed\n",child,Current_Align_P/local_N);
             }
         if (Current_Remain_P!=0){
          //do something
@@ -1973,21 +1981,35 @@ int main(int argc ,char* argv[]){
         }
 
         std::sort(V.begin(),V.end(),comp);
+	/*
         float rate=Particle_Current.size()-0.05*Global_Particle.size();
-        for (int i=0;i<Particle_Current.size();i++){
-            if (i>rate){
+        for (int i=int(rate);i<Particle_Current.size();i++){
                 Global_Good_Particle.push_back(V[i].index);
-            }
         }
+	*/
+	float rate=0.2*Global_Particle.size();
+	for (int i=0;i<Particle_Current.size();i++){
+		if (i<rate){
+		Global_Bad_Particle.push_back(V[i].index);
+		}
+	}
         fprintf(OUTFILE,"iteration\t%d\tcompleted\n",control_iteration);
         //need some other code
 
     }
 
     fprintf(OUTFILE,"Get Particles\n");
+    /*
     for (auto x: Global_Good_Particle){
         fprintf(OUTFILE,"%d\n",x);
     }
+    */
+    for (auto x: Global_Particle ){
+	std::vector<int>::iterator iter=std::find(Global_Bad_Particle.begin(),Global_Bad_Particle.end(),x);
+	    if (iter==Global_Bad_Particle.end()){
+		fprintf(OUTFILE,"%d\n",x);	    
+	}
+	}
     ///////////////
         fclose(f);
         fclose(outputfile);
