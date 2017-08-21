@@ -2,6 +2,91 @@
 #include <time.h>
 #include <sstream>
 #include "mrcprocess.h"
+float interpolate_bilinear(cv::Mat &mat_src,double ri,int rf,int rc,double ti,int tf,int tc){
+  double inter_value=0.0;
+  if (rf == rc && tc == tf){
+    inter_value = mat_src.ptr<float>(rc)[tc];
+  }
+  else if (rf ==rc){
+    inter_value = (ti - tf)*mat_src.ptr<float>(rf)[tc]+(tc - ti)*mat_src.ptr<float>(rf)[tf];
+  }
+  else if (tf == tc){
+    inter_value = (ri -rf)*mat_src.ptr<float>(tc)[tf] + (rc - ri)*mat_src.ptr<float>(rf)[tf];
+  }
+  else{
+    double inter_r1 = (ti - tf)*mat_src.ptr<float>(rf)[tc] + (tc - ti)*mat_src.ptr<float>(rf)[tf];
+    double inter_r2 = (ti - tf)*mat_src.ptr<float>(rc)[tc] + (tc - ti)*mat_src.ptr<float>(rc)[tf];
+    inter_value = (ri - rf)*inter_r2 + (rc-ri) * inter_r1;
+  }
+  return (float) inter_value;
+}
+bool cartesian_to_polar(cv::Mat &mat_c,cv::Mat &mat_p,int img_d){
+  mat_p = cv::Mat::zeros(img_d,img_d,CV_32FC1);
+  int line_len = mat_c.rows;
+  int line_num = mat_c.cols;
+  double delta_r = (2.0*line_len)/(img_d-1);
+  double delta_t = 2.0*M_PI/line_num;
+  double center_x = (img_d-1)/2.0;
+  double center_y = (img_d-1)/2.0;
+
+  for (int i=0;i<img_d;i++){
+    for (int j=0;j<img_d;j++){
+      double rx = j-center_x;
+      double ry = center_y -i;
+      double r = std::sqrt(rx*rx + ry*ry);
+      if (r<=(img_d-1)/2.0){
+        double ri = r*delta_r;
+        int rf = (int)std::floor(ri);
+        int rc = (int)std::ceil(ri);
+
+        if (rf<0){
+          rf=0;
+        }
+        if (rc>(line_len-1)){
+          rc = line_len - 1;
+        }
+        double t = std::atan2(ry,rx);
+        if (t<0){
+          t = t + 2.0*M_PI;
+        }
+
+        double ti = t/delta_t;
+        int tf= (int)std::floor(ti);
+        int tc = (int)std::ceil(ti);
+
+        if (tf<0){
+          tf=0;
+        }
+        if (tc>(line_num -1 )){
+          tc = line_num -1;
+        }
+        mat_p.ptr<float>(i)[j]=interpolate_bilinear(mat_c,ri,rf,rc,ti,tf,tc);
+      }
+    }
+  }
+  return true;
+}
+bool polar_to_cartesian(cv::Mat & mat_p,cv::Mat & mat_c,int rows_c,int cols_c){
+  mat_c = cv::Mat::zeros(rows_c,cols_c,CV_32FC1);
+  int polar_d=mat_p.cols;
+  double polar_r = polar_d/2.0;
+  double delta_r = polar_r/rows_c;
+  double delta_t = 2.0*M_PI/cols_c;
+  double center_polar_x = (polar_d -1)/2.0;
+  double center_polar_y = (polar_d - 1)/2.0;
+  for (int i=0;i<cols_c;i++){
+    double theta_p = i*delta_t;
+    double sin_theta = std::sin(theta_p);
+    double cos_theta = std::cos(theta_p);
+    for (int j=0;j<rows_c;j++){
+      double temp_r = j *delta_r;
+      int polar_x = (int)(center_polar_x + temp_r*cos_theta);
+      int polar_y = (int)(center_polar_y - temp_r*sin_theta);
+      mat_c.ptr<float>(j)[i] = mat_p.ptr<float>(polar_y)[polar_x];
+    }
+  }
+  return true;
+}
 int main(int argc,char * argv[]){
     int cml_size=0;
     int i,j,k,l;
@@ -72,11 +157,14 @@ int main(int argc,char * argv[]){
         cv::Mat image_mrc=cv::Mat(cml_size,cml_size,CV_32FC1,tmp);
 
 
-//        cv::Mat afdft_mrc=CML::imdft(image_mrc);
+        cv::Mat image_dft=CML::imdft(image_mrc);
         cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
-        CML::linearpolar(image_mrc,lp_mrc);
+        CML::linearpolar(image_dft,lp_mrc);
+        //cartesian_to_polar(image_dft,lp_mrc,cml_size);
+        //polar_to_cartesian(image_dft,lp_mrc,cml_size,cml_size);
         if (i==0 or i==5 or i==43){
             MrcProcess::showimagecpp(image_mrc);
+            MrcProcess::showimagecpp(image_dft);
             MrcProcess::showimagecpp(lp_mrc);
         }
 		
@@ -95,13 +183,14 @@ int main(int argc,char * argv[]){
             }
 
         }
-		cv::Size cutsize=cv::Size(SIZE_COMP-36,SIZE_COMP);
+        //cv::Size cutsize=cv::Size(SIZE_COMP-36,SIZE_COMP);
+                cv::Size cutsize=cv::Size(SIZE_COMP-106,SIZE_COMP);
 //		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1);
-		float tmp_cut[SIZE_COMP][SIZE_COMP-36];
+		float tmp_cut[SIZE_COMP][SIZE_COMP-106];
 		
 		for (j=0;j<SIZE_COMP;j++){
-			for (k=0;k<SIZE_COMP-36;k++){
-				tmp_cut[j][k]=lp_mrc.at<float>(j,k+36);
+			for (k=0;k<22;k++){
+				tmp_cut[j][k]=lp_mrc.at<float>(j,k+1);
 			}
 		}
 		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
@@ -141,10 +230,11 @@ int main(int argc,char * argv[]){
         fread(tmp,sizeof(tmp[0]),cml_size_pow,inmrc);
 
         cv::Mat image_mrc=cv::Mat(cml_size,cml_size,CV_32FC1,tmp);
-//        cv::Mat afdft_mrc=CML::imdft(image_mrc);
+        cv::Mat image_dft=CML::imdft(image_mrc);
         cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
-        CML::linearpolar(image_mrc,lp_mrc);\
-
+        //cartesian_to_polar(image_dft,lp_mrc,cml_size);
+        CML::linearpolar(image_dft,lp_mrc);
+        //polar_to_cartesian(image_dft,lp_mrc,cml_size,cml_size);
 //        MrcProcess::showimagecpp(lpdft_mrc);
 
 //        cv::normalize(lpdft_mrc,lpdft_mrc,0,1,CV_MINMAX);
@@ -160,13 +250,13 @@ int main(int argc,char * argv[]){
             }
 
         }
-		cv::Size cutsize=cv::Size(SIZE_COMP-36,SIZE_COMP);
+		cv::Size cutsize=cv::Size(SIZE_COMP-106,SIZE_COMP);
 //		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1);
-		float tmp_cut[SIZE_COMP][SIZE_COMP-36];
+		float tmp_cut[SIZE_COMP][SIZE_COMP-106];
 		
 		for (j=0;j<SIZE_COMP;j++){
-			for (k=0;k<SIZE_COMP-36;k++){
-				tmp_cut[j][k]=lp_mrc.at<float>(j,k+36);
+			for (k=0;k<22;k++){
+				tmp_cut[j][k]=lp_mrc.at<float>(j,k+1);
 			}
 		}
 		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
