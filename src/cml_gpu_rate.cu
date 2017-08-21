@@ -1987,7 +1987,8 @@ int main(int argc ,char* argv[]){
                 Global_Good_Particle.push_back(V[i].index);
         }
 	*/
-	float rate=0.2*Global_Particle.size();
+	//float rate=0.2*Global_Particle.size();
+	int rate=0;//rate=0.0,so it works as directive iteration;
 	for (int i=0;i<Particle_Current.size();i++){
 		if (i<rate){
 		Global_Bad_Particle.push_back(V[i].index);
