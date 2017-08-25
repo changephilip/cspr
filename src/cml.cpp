@@ -72,8 +72,8 @@ cv::Mat imdft(cv::Mat &I)
         q1.copyTo(tmp);
         q2.copyTo(q1);
         tmp.copyTo(q2);
-
-        cv::normalize(magI,magI,0,1,CV_MINMAX);
+		//don't do normalize in fft
+        //cv::normalize(magI,magI,0,1,CV_MINMAX);
 
         //imshow("Input Image",I);
         //imshow("spectrum magnitude",magI);
