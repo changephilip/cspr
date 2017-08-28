@@ -164,8 +164,11 @@ int main(int argc,char * argv[]){
         //polar_to_cartesian(image_dft,lp_mrc,cml_size,cml_size);
         if (i==0 or i==5 or i==43){
             MrcProcess::showimagecpp(image_mrc);
+			//MrcProcess::showimagecpp(MrcProcess::mynorm(image_mrc));
             MrcProcess::showimagecpp(image_dft);
+			//MrcProcess::showimagecpp(MrcProcess::mynorm(image_dft));
             MrcProcess::showimagecpp(lp_mrc);
+			//MrcProcess::showimagecpp(MrcProcess::mynorm(lp_mrc));
         }
 		
 //        MrcProcess::showimagecpp(lpdft_mrc);

@@ -52,8 +52,8 @@ cv::Mat imdft(cv::Mat &I)
         cv::magnitude(planes[0],planes[1],planes[0]);
         cv::Mat magI = planes[0];
 
-        magI += cv::Scalar::all(1);
-        log(magI,magI);
+        //magI += cv::Scalar::all(1);
+        //log(magI,magI);
 
         magI= magI(cv::Rect(0,0,magI.cols & -2 ,magI.rows & -2));
         int cx = magI.cols/2;

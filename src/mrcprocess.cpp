@@ -70,7 +70,7 @@ cv::Mat mynorm(const cv::Mat &image)
     cv::Mat_<uchar>::iterator it = image2.begin();
     cv::Mat_<uchar>::iterator itend = image2.end();
     for (;it!=itend;++it){
-       (*it)=255.0*((*it)-minVal)/(maxVal-minVal);
+       (*it)=std::ceil(255.0*((*it)-minVal)/(maxVal-minVal));
     }
     return image2;
 }
