@@ -1542,13 +1542,13 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
         }
     }
 //debug print s_value
-    for (int i=0;i<local_N;i++){
+//    for (int i=0;i<local_N;i++){
 //	fprintf(debug_f,"%d\t",inList[i]);
-	for (int j=0;j<local_N;j++){
+//	for (int j=0;j<local_N;j++){
 //		fprintf(debug_f,"%f\t",sysSvalue[i][j]);
-		}
+//		}
 //	fprintf(debug_f,"\n");
-	}
+//	}
     for (int i=0;i<local_N;i++){
 	delete[] sysSvalue[i];
 	}
