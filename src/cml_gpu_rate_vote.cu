@@ -1451,6 +1451,200 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
 
 }
 
+
+__constant__ gpu_cons;/* 180.0/M_PI */
+__constant__ gpu_cons2;/* 2*M_PI/dft_size */
+__constant__ gpu_Trecurse;/* 180.0f/T */
+__constant__ gpu_two_sigma_pow;/* 2*(180.0f/T)*(180.0f/T) */
+__constant__ gpu_half_pow_pi;/* sqrt(2*M_PI)*(180.0f/T) */
+__device__ float gpu_cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj){
+
+    float a,b,c,t,angleij;
+    if (cmlij==-1 or cmlik==-1 or cmljk==-1){
+        angleij=-10.0f;
+    }
+    else{
+        a = __cosf((cmlkj-cmlki)*gpu_cons2);
+        b = __cosf((cmljk-cmlji)*gpu_cons2);
+        c = __cosf((cmlik-cmlij)*gpu_cons2);
+
+        if ((1+2*a*b*c)>(a*a+b*b+c*c)){
+            t = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
+            if (t<1.0f and t>-1.0f){
+                angleij = acosf(t)*gpu_cons;
+            }
+            else if (t>=1){
+                angleij=0.0f;
+            }
+            else if (t<=-1){
+                angleij=180.0f;
+            }
+        }
+        else {angleij = -10.0f;}
+    }
+    return angleij;
+}
+
+void gpu_combined_kernel(int N,int *index_i,int *index_j,float *CML_Matrix,int T,float *hist_value){
+    __shared__ float sp[N];
+    __shared__ float sp_tmp[N];
+    __shared__ float tmp_hist[T];
+
+    int i,j;
+    index=blockIdx.x+blockIdx.y*gridDim.x;
+    i=index_i[index];
+    j=index_j[index];
+    int threadIndex=threadIdx.x;
+    sp[threadIndex]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+threadIndex],CML_Matrix[j*N+i],CML_Matrix[j*N+threadIndex],CML_Matrix[threadIndex*N+i],CML_Matrix[threadIndex*N+j],cons);
+    sp[threadIndex+1024]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+1024)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+1024)],CML_Matrix[(threadIndex+1024)*N+i],CML_Matrix[(threadIndex+1024)*N+j]);
+    sp[threadIndex+2048]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+2048)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+2048)],CML_Matrix[(threadIndex+2048)*N+i],CML_Matrix[(threadIndex+2048)*N+j]);;
+    sp[threadIndex+3072]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+3072)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+3072)],CML_Matrix[(threadIndex+3072)*N+i],CML_Matrix[(threadIndex+3072)*N+j]);;
+    if (threadIndex<904){
+        sp[threadIndex+4096]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+4096)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+4096)],CML_Matrix[(threadIndex+4096)*N+i],CML_Matrix[(threadIndex+4096)*N+j]);;
+    }
+    __syncthreads();
+    for (int s=0;s<T;s++) {
+        float alpha_t_alpha12;
+        if (sp[threadIndex] != -10.0) {
+            alpha_t_alpha12 = gpu_Trecurse * s - sp[threadIndex];
+            sp_tmp[threadIndex] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
+        } else { sp_tmp[threadIndex] = 0.0f; }
+        if (sp[threadIndex + 1024] != -10.0) {
+            alpha_t_alpha12 = gpu_Trecurse * s - sp[threadIndex + 1024];
+            sp_tmp[threadIndex + 1024] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
+        } else { sp_tmp[threadIndex + 1024] = 0.0f; }
+        if (sp[threadIndex + 2048] != -10.0) {
+            alpha_t_alpha12 = gpu_Trecurse * s - sp[threadIndex + 2048];
+            sp_tmp[threadIndex + 2048] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
+        } else { sp_tmp[threadIndex + 2048] = 0.0f; }
+        if (sp[threadIndex + 3072] != -10.0) {
+            alpha_t_alpha12 = gpu_Trecurse * s - sp[threadIndex + 3072];
+            sp_tmp[threadIndex + 3072] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
+        } else { sp_tmp[threadIndex + 3072] = 0.0f; }
+//        if (sp[threadIndex + 4096] != -10.0f) {
+//            alpha_t_alpha12 = Trecurse * s - sp[threadIndex + 4096];
+//            sp_tmp[threadIndex + 4096] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
+//        } else { sp_tmp[threadIndex + 4096] = 0.0f; }
+        /*do 4 or 5 times*/
+        if (threadIndex < 904) {
+            if (sp[threadIndex + 4096] != -10.0) {
+                alpha_t_alpha12 = gpu_Trecurse * l - sp[threadIndex + 4096];
+                sp_tmp[threadIndex + 4096] =
+                        exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
+            } else { sp_tmp[threadIndex + 4096] = 0.0f; }
+        }
+        __syncthreads();
+        /*reduce*/
+        /*accumulate four or five items in one*/
+        if (threadIndex < 1024) {
+            sp_tmp[threadIndex] += sp_tmp[threadIndex + 1024] + sp_tmp[threadIndex + 2048] + sp_tmp[threadIndex + 3072];
+            if (threadIndex < 904) {
+                sp_tmp[threadIndex] += sp_tmp[threadIndex + 4096];
+            }
+        }
+        __syncthreads();
+        for (int activethreads = 1024 >> 1; activethreads > 32; activethreads >>= 1) {
+            if (threadIndex < activethreads) {
+                sp_tmp[threadIndex] += sp_tmp[threadIndex + activethreads];
+            }
+            __syncthreads();
+        }
+
+        if (threadIndex < 32) {
+            volatile float *ws = sp_tmp;
+            ws[threadIndex] += ws[threadIndex + 32];
+            ws[threadIndex] += ws[threadIndex + 16];
+            ws[threadIndex] += ws[threadIndex + 8];
+            ws[threadIndex] += ws[threadIndex + 4];
+            ws[threadIndex] += ws[threadIndex + 2];
+            ws[threadIndex] += ws[threadIndex + 1];
+            if (threadIndex == 0) {
+                volatile float *ws = sp;
+                tmp_hist[s] = ws[0];
+            }
+        }
+        __syncthreads();
+
+    }
+    if (threadIndex<8){
+        tmp_hist[threadIndex]=fmaxf(tmp_hist[threadIndex],tmp_hist[threadIndex+64]);
+    }
+    __syncthreads();
+
+    if (threadIndex<32){
+        volatile float *his=tmp_hist;
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+32]);
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+16]);
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+8]);
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+4]);
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+2]);
+        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+1]);
+        if (threadIndex==0){
+            volatile float *his= tmp_hist;
+            hist_value[(2*N-1-i)*i/2+j-(i+1)]=his[0];
+        }
+    }
+
+}
+
+void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T,int dft_size){
+    //CML_matrix to 1-dimension array,prepare result matrix
+    //copy cml_matrix
+    int c_size=N*(N-1)/2;
+    int a,b;
+    a=2500;
+    b=4999;
+    float *cml_oned_matrix = new float[N*(N-1)/2];
+    float *index_i = new int[N*(N-1)/2];
+    float *index_j = new int[N*(N-1)/2];
+    for (int i=0;i<N;i++){
+        for (int j=i+1;j<N;j++){
+            cml_oned_matrix[(2*N-1-i)*i/2+j-(i+1)]=CML_Matrix[i][j];
+            index_i[(2*N-1-i)*i/2+j-(i+1)]=i;
+            index_j[(2*N-1-i)*i/2+j-(i+1)]=j;
+        }
+    }
+    //allocate memory on gpu
+    float *d_cml_maxtrix;
+    float *d_hist_return;
+    float *d_index_i;
+    float *d_index_j;
+
+    cudaMalloc((void **)&d_cml_maxtrix,sizeof(float)*c_size);
+    cudaMalloc((void **)&d_hist_return,sizeof(float)*c_size);
+    cudaMalloc((void **)&d_index_i,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_index_j,sizeof(int)*c_size);
+
+    cudaMemcpy(d_cml_maxtrix,cml_oned_matrix,sizeof(float)*c_size,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_index_i,index_i,sizeof(int)*c_size,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_index_j,index_j,sizeof(int)*c_size,cudaMemcpyHostToDevice);
+
+    //allocate constant
+    float cs_gpu_cons = 180.0/M_PI;
+    float cs_gpu_cons2 = 2*M_PI/dft_size;
+    float cs_gpu_trecurse = 180.0f/T ;
+    float cs_gpu_two_sigma_pow = 2*(180.0f/T)*(180.0f/T);
+    float cs_gpu_half_pow_pi = sqrt(2*M_PI)*(180.0f/T);
+
+    cudaMemcpyToSymbol(gpu_cons, cs_gpu_cons, sizeof(float));
+    cudaMemcpyToSymbol(gpu_cons2, cs_gpu_cons2, sizeof(float));
+    cudaMemcpyToSymbol(gpu_Trecurse, cs_gpu_trecurse, sizeof(float));
+    cudaMemcpyTosymbol(gpu_two_sigma_pow, cs_gpu_two_sigma_pow, sizeof(float));
+    cudaMemcpyToSymbol(gpu_half_pow_pi, cs_gpu_half_pow_pi, sizeof(flaot));
+    dim3 dimGrid(a,b,1);
+    dim3 dimBlock(1024,1,1);
+
+    gpu_combined_kernel<<<dimGrid,dimBlock,(2*N+T)*sizeof(float)>>>(N,d_index_i,d_index_j,d_cml_maxtrix,T,d_hist_return);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(hist_return,d_hist_return, sizeof(float)*c_size,cudaMemcpyDeviceToHost);
+
+    cudaFree(d_cml_maxtrix);
+    cudaFree(d_hist_return);
+    cudaFree(d_index_i);
+    cudaFree(d_index_j);
+}
+
 void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow,FILE *debug_f,FILE *hist_f,std::vector<voted> &good_Particle){
     int time_Start,time_Readfile,time_Ncc,time_Voting,time_Sort,time_End;
     printf("in List_wrapper\n");
@@ -1542,13 +1736,13 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
         }
     }
 //debug print s_value
-    for (int i=0;i<local_N;i++){
+//    for (int i=0;i<local_N;i++){
 //	fprintf(debug_f,"%d\t",inList[i]);
-	for (int j=0;j<local_N;j++){
+//	for (int j=0;j<local_N;j++){
 //		fprintf(debug_f,"%f\t",sysSvalue[i][j]);
-		}
+//		}
 //	fprintf(debug_f,"\n");
-	}
+//	}
     for (int i=0;i<local_N;i++){
 	delete[] sysSvalue[i];
 	}
@@ -1608,9 +1802,20 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
             }
         }
     }
-    //a simple deployment of gpu_voting
+
 
     time_Voting = time(NULL);
+    //a simple deployment of gpu_voting
+    float *gpu_hist_Peak =  new float[local_N*(local_N-1)/2];
+    Voting_wrapper(cml_Pair_Matrix,local_N,gpu_hist_Peak,T,dft_size);
+    int time_gpu_voting=time(NULL);
+    //compare two hist_value
+    float error_hist;
+    int c_size=local_N*(local_N-1)/2;
+    error_hist=cblas_sdot(c_size,hist_Peak,1,hist_Peak,1)+cblas_sdot(c_size,gpu_hist_Peak,1,gpu_hist_Peak,1)-2*cblas_sdot(c_size,gpu_hist_Peak,1,hist_Peak,1);
+    error_hist=sqrt(error_hist/c_szie);
+    printf("error hist is %f\n",error_hist);
+    delete[] gpu_hist_Peak;
     //get voted_value
     int r=4;
 
@@ -1703,205 +1908,14 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     //write log
     fprintf(log,"Ncc_Time %d\n",time_Ncc-time_Readfile);
     fprintf(log,"Voting_Time %d\n",time_Voting-time_Ncc);
-    fprintf(log,"Sort_Time %d\n",time_Sort-time_Voting);
+    fprintf(log,"gpu_voting_time %d\n",time_gpu_voting-time_Voting);
+    fprintf(log,"Sort_Time %d\n",time_Sort-time_gpu_voting);
 
 
 }
 
 
-__constant__ gpu_cons=180.0/M_PI;
-__constant__ gpu_cons2=2*M_PI/dft_size;
-__constant__ gpu_Trecurse=180.0f/T;
-__device__ float cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj,float cons2){
 
-    float a,b,c,t,angleij;
-    if (cmlij==-1 or cmlik==-1 or cmljk==-1){
-        angleij=-10.0f;
-    }
-    else{
-        a = __cosf((cmlkj-cmlki)*cons2);
-        b = __cosf((cmljk-cmlji)*cons2);
-        c = __cosf((cmlik-cmlij)*cons2);
-
-        if ((1+2*a*b*c)>(a*a+b*b+c*c)){
-            t = (a-b*c)/(sqrt(1-b*b)*sqrt(1-c*c));
-            if (t<1.0f and t>-1.0f){
-                angleij = acosf(t)*cons;
-            }
-            else if (t>=1){
-                angleij=0.0f;
-            }
-            else if (t<=-1){
-                angleij=180.0f;
-            }
-        }
-        else {angleij = -10.0f;}
-    }
-    return angleij;
-}
-__constant__ two_sigma_pow=2*(180.0f/T)*(180.0f/T);
-__constant__ half_pow_pi=sqrt(2*M_PI)*(180.0f/T);
-void gpu_combined_kernel(int N,int *index_i,int *index_j,float *CML_Matrix,int T,float *hist_value){
-    __shared__ float sp[N];
-    __shared__ float sp_tmp[N];
-    __shared__ float tmp_hist[T];
-
-    int i,j;
-    index=blockIdx.x+blockIdx.y*gridDim.x;
-    i=index_i[index];
-    j=index_j[index];
-    int threadIndex=threadIdx.x;
-    sp[threadIndex]=cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+threadIndex],CML_Matrix[j*N+i],CML_Matrix[j*N+threadIndex],CML_Matrix[threadIndex*N+i],CML_Matrix[threadIndex*N+j],cons);
-    sp[threadIndex+1024]=cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+1024)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+1024)],CML_Matrix[(threadIndex+1024)*N+i],CML_Matrix[(threadIndex+1024)*N+j],cons);
-    sp[threadIndex+2048]=cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+2048)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+2048)],CML_Matrix[(threadIndex+2048)*N+i],CML_Matrix[(threadIndex+2048)*N+j],cons);;
-    sp[threadIndex+3072]=cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+3072)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+3072)],CML_Matrix[(threadIndex+3072)*N+i],CML_Matrix[(threadIndex+3072)*N+j],cons);;
-    if (threadIndex<904){
-        sp[threadIndex+4096]=cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+4096)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+4096)],CML_Matrix[(threadIndex+4096)*N+i],CML_Matrix[(threadIndex+4096)*N+j],cons);;
-    }
-    __syncthreads();
-    for (int s=0;s<T;s++) {
-        float alpha_t_alpha12;
-        if (sp[threadIndex] != -10.0) {
-            alpha_t_alpha12 = Trecurse * s - sp[threadIndex];
-            sp_tmp[threadIndex] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-        } else { sp_tmp[threadIndex] = 0.0f; }
-        if (sp[threadIndex + 1024] != -10.0) {
-            alpha_t_alpha12 = Trecurse * s - sp[threadIndex + 1024];
-            sp_tmp[threadIndex + 1024] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-        } else { sp_tmp[threadIndex + 1024] = 0.0f; }
-        if (sp[threadIndex + 2048] != -10.0) {
-            alpha_t_alpha12 = Trecurse * s - sp[threadIndex + 2048];
-            sp_tmp[threadIndex + 2048] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-        } else { sp_tmp[threadIndex + 2048] = 0.0f; }
-        if (sp[threadIndex + 3072] != -10.0) {
-            alpha_t_alpha12 = Trecurse * s - sp[threadIndex + 3072];
-            sp_tmp[threadIndex + 3072] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-        } else { sp_tmp[threadIndex + 3072] = 0.0f; }
-//        if (sp[threadIndex + 4096] != -10.0f) {
-//            alpha_t_alpha12 = Trecurse * s - sp[threadIndex + 4096];
-//            sp_tmp[threadIndex + 4096] = exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-//        } else { sp_tmp[threadIndex + 4096] = 0.0f; }
-        /*do 4 or 5 times*/
-        if (threadIndex < 904) {
-            if (sp[threadIndex + 4096] != -10.0) {
-                alpha_t_alpha12 = Trecurse * l - sp[threadIndex + 4096];
-                sp_tmp[threadIndex + 4096] =
-                        exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / two_sigma_pow) / half_pow_pi;
-            } else { sp_tmp[threadIndex + 4096] = 0.0f; }
-        }
-        __syncthreads();
-        /*reduce*/
-        /*accumulate four or five items in one*/
-        if (threadIndex < 1024) {
-            sp_tmp[threadIndex] += sp_tmp[threadIndex + 1024] + sp_tmp[threadIndex + 2048] + sp_tmp[threadIndex + 3072];
-            if (threadIndex < 904) {
-                sp_tmp[threadIndex] += sp_tmp[threadIndex + 4096];
-            }
-        }
-        __syncthreads();
-        for (int activethreads = 1024 >> 1; activethreads > 32; activethreads >>= 1) {
-            if (threadIndex < activethreads) {
-                sp_tmp[threadIndex] += sp_tmp[threadIndex + activethreads];
-            }
-            __syncthreads();
-        }
-
-        if (threadIndex < 32) {
-            volatile float *ws = sp_tmp;
-            ws[threadIndex] += ws[threadIndex + 32];
-            ws[threadIndex] += ws[threadIndex + 16];
-            ws[threadIndex] += ws[threadIndex + 8];
-            ws[threadIndex] += ws[threadIndex + 4];
-            ws[threadIndex] += ws[threadIndex + 2];
-            ws[threadIndex] += ws[threadIndex + 1];
-            if (threadIndex == 0) {
-                volatile float *ws = sp;
-                tmp_hist[s] = ws[0];
-            }
-        }
-        __syncthreads();
-
-    }
-    if (threadIndex<8){
-        tmp_hist[threadIndex]=fmaxf(tmp_hist[threadIndex],tmp_hist[threadIndex+64]);
-    }
-    __syncthreads();
-
-    if (threadIndex<32){
-        volatile float *his=tmp_hist;
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+32]);
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+16]);
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+8]);
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+4]);
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+2]);
-        his[threadIndex]=fmaxf(his[threadIndex],his[threadIndex+1]);
-        if (threadIndex==0){
-            volatile float *his= tmp_hist;
-            hist_value[(2*N-1-i)*i/2+j-(i+1)]=his[0];
-        }
-    }
-
-}
-
-void wrapper_voting_kernel(){
-
-}
-void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T){
-    //CML_matrix to 1-dimension array,prepare result matrix
-    //copy cml_matrix
-    int c_size=N*(N-1)/2;
-    int a,b;
-    a=2500;
-    b=4999;
-    float *cml_oned_matrix = new float[N*(N-1)/2];
-    float *index_i = new int[N*(N-1)/2];
-    float *index_j = new int[N*(N-1)/2];
-    for (int i=0;i<N;i++){
-        for (int j=i+1;j<N;j++){
-            cml_oned_matrix[(2*N-1-i)*i/2+j-(i+1)]=CML_Matrix[i][j];
-            index_i[(2*N-1-i)*i/2+j-(i+1)]=i;
-            index_j[(2*N-1-i)*i/2+j-(i+1)]=j;
-        }
-    }
-    //allocate memory on gpu
-    float *d_cml_maxtrix;
-    float *d_hist_return;
-    float *d_index_i;
-    float *d_index_j;
-
-    cudaMalloc((void **)&d_cml_maxtrix,sizeof(float)*c_size);
-    cudaMalloc((void **)&d_hist_return,sizeof(float)*c_size);
-    cudaMalloc((void **)&d_index_i,sizeof(int)*c_size);
-    cudaMalloc((void **)&d_index_j,sizeof(int)*c_size);
-
-    cudaMemcpy(d_cml_maxtrix,cml_oned_matrix,sizeof(float)*c_size,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_index_i,index_i,sizeof(int)*c_size,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_index_j,index_j,sizeof(int)*c_size,cudaMemcpyHostToDevice);
-
-    //allocate constant
-    __constant__ float cs_gpu_cons;
-    __constant__ float cs_gpu_cons2;
-    __constant__ float cs_gpu_trecurse;
-    float gpu_cons=180.0/M_PI;
-    float gpu_cons2=2*M_PI/dft_size;
-    float gpu_trecurse=180.0f/T;
-    cudaMemcpyToSymbol(cs_gpu_cons,gpu_cons,sizeof(float));
-    cudaMemcpyToSymbol(cs_gpu_cons2,gpu_cons2,sizeof(float));
-    cudaMemcpyToSymbol(cs_gpu_trecurse,gpu_trecurse,sizeof(float));
-
-    dim3 dimGrid(a,b,1);
-    dim3 dimBlock(1024,1,1);
-
-    gpu_combined_kernel<<<dimGrid,dimBlock,(2*N+T)*sizeof(float)>>>(N,d_index_i,d_index_j,d_cml_maxtrix,T,d_hist_return);
-    cudaDeviceSynchronize();
-
-    cudaMemcpy(hist_return,d_hist_return, sizeof(float)*c_size,cudaMemcpyDeviceToHost);
-
-    cudaFree(d_cml_maxtrix);
-    cudaFree(d_hist_return);
-    cudaFree(d_index_i);
-    cudaFree(d_index_j);
-}
 int main(int argc ,char* argv[]){
     int oc;                     /*???? */
     //char *b_opt_arg;            /*?????? */
