@@ -1452,11 +1452,11 @@ void block_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,i
 }
 
 
-__constant__ gpu_cons;/* 180.0/M_PI */
-__constant__ gpu_cons2;/* 2*M_PI/dft_size */
-__constant__ gpu_Trecurse;/* 180.0f/T */
-__constant__ gpu_two_sigma_pow;/* 2*(180.0f/T)*(180.0f/T) */
-__constant__ gpu_half_pow_pi;/* sqrt(2*M_PI)*(180.0f/T) */
+__constant__ float gpu_cons;/* 180.0/M_PI */
+__constant__ float gpu_cons2;/* 2*M_PI/dft_size */
+__constant__ float gpu_Trecurse;/* 180.0f/T */
+__constant__ float gpu_two_sigma_pow;/* 2*(180.0f/T)*(180.0f/T) */
+__constant__ float gpu_half_pow_pi;/* sqrt(2*M_PI)*(180.0f/T) */
 __device__ float gpu_cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,int cmlkj){
 
     float a,b,c,t,angleij;
@@ -1485,17 +1485,17 @@ __device__ float gpu_cvoting(int cmlij,int cmlik,int cmlji,int cmljk,int cmlki,i
     return angleij;
 }
 
-void gpu_combined_kernel(int N,int *index_i,int *index_j,float *CML_Matrix,int T,float *hist_value){
-    __shared__ float sp[N];
-    __shared__ float sp_tmp[N];
-    __shared__ float tmp_hist[T];
+__global__ void gpu_combined_kernel(int N,int *index_i,int *index_j,int *CML_Matrix,int T,float *hist_value){
+    __shared__ float sp[5000];
+    __shared__ float sp_tmp[5000];
+    __shared__ float tmp_hist[72];
 
     int i,j;
-    index=blockIdx.x+blockIdx.y*gridDim.x;
+    int index=blockIdx.x+blockIdx.y*gridDim.x;
     i=index_i[index];
     j=index_j[index];
     int threadIndex=threadIdx.x;
-    sp[threadIndex]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+threadIndex],CML_Matrix[j*N+i],CML_Matrix[j*N+threadIndex],CML_Matrix[threadIndex*N+i],CML_Matrix[threadIndex*N+j],cons);
+    sp[threadIndex]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+threadIndex],CML_Matrix[j*N+i],CML_Matrix[j*N+threadIndex],CML_Matrix[threadIndex*N+i],CML_Matrix[threadIndex*N+j]);
     sp[threadIndex+1024]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+1024)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+1024)],CML_Matrix[(threadIndex+1024)*N+i],CML_Matrix[(threadIndex+1024)*N+j]);
     sp[threadIndex+2048]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+2048)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+2048)],CML_Matrix[(threadIndex+2048)*N+i],CML_Matrix[(threadIndex+2048)*N+j]);;
     sp[threadIndex+3072]=gpu_cvoting(CML_Matrix[i*N+j],CML_Matrix[i*N+(threadIndex+3072)],CML_Matrix[j*N+i],CML_Matrix[j*N+(threadIndex+3072)],CML_Matrix[(threadIndex+3072)*N+i],CML_Matrix[(threadIndex+3072)*N+j]);;
@@ -1528,7 +1528,7 @@ void gpu_combined_kernel(int N,int *index_i,int *index_j,float *CML_Matrix,int T
         /*do 4 or 5 times*/
         if (threadIndex < 904) {
             if (sp[threadIndex + 4096] != -10.0) {
-                alpha_t_alpha12 = gpu_Trecurse * l - sp[threadIndex + 4096];
+                alpha_t_alpha12 = gpu_Trecurse * s - sp[threadIndex + 4096];
                 sp_tmp[threadIndex + 4096] =
                         exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 / gpu_two_sigma_pow) / gpu_half_pow_pi;
             } else { sp_tmp[threadIndex + 4096] = 0.0f; }
@@ -1587,16 +1587,16 @@ void gpu_combined_kernel(int N,int *index_i,int *index_j,float *CML_Matrix,int T
 
 }
 
-void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T,int dft_size){
+void Voting_wrapper(int **CML_Matrix,int N,float *hist_return,int T,int dft_size){
     //CML_matrix to 1-dimension array,prepare result matrix
     //copy cml_matrix
     int c_size=N*(N-1)/2;
     int a,b;
     a=2500;
     b=4999;
-    float *cml_oned_matrix = new float[N*(N-1)/2];
-    float *index_i = new int[N*(N-1)/2];
-    float *index_j = new int[N*(N-1)/2];
+    int *cml_oned_matrix = new int [N*(N-1)/2];
+    int *index_i = new int[N*(N-1)/2];
+    int *index_j = new int[N*(N-1)/2];
     for (int i=0;i<N;i++){
         for (int j=i+1;j<N;j++){
             cml_oned_matrix[(2*N-1-i)*i/2+j-(i+1)]=CML_Matrix[i][j];
@@ -1605,17 +1605,17 @@ void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T,int dft_si
         }
     }
     //allocate memory on gpu
-    float *d_cml_maxtrix;
+    int *d_cml_maxtrix;
     float *d_hist_return;
-    float *d_index_i;
-    float *d_index_j;
+    int *d_index_i;
+    int *d_index_j;
 
-    cudaMalloc((void **)&d_cml_maxtrix,sizeof(float)*c_size);
+    cudaMalloc((void **)&d_cml_maxtrix,sizeof(int)*c_size);
     cudaMalloc((void **)&d_hist_return,sizeof(float)*c_size);
     cudaMalloc((void **)&d_index_i,sizeof(int)*c_size);
     cudaMalloc((void **)&d_index_j,sizeof(int)*c_size);
 
-    cudaMemcpy(d_cml_maxtrix,cml_oned_matrix,sizeof(float)*c_size,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_cml_maxtrix,cml_oned_matrix,sizeof(int)*c_size,cudaMemcpyHostToDevice);
     cudaMemcpy(d_index_i,index_i,sizeof(int)*c_size,cudaMemcpyHostToDevice);
     cudaMemcpy(d_index_j,index_j,sizeof(int)*c_size,cudaMemcpyHostToDevice);
 
@@ -1626,15 +1626,15 @@ void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T,int dft_si
     float cs_gpu_two_sigma_pow = 2*(180.0f/T)*(180.0f/T);
     float cs_gpu_half_pow_pi = sqrt(2*M_PI)*(180.0f/T);
 
-    cudaMemcpyToSymbol(gpu_cons, cs_gpu_cons, sizeof(float));
-    cudaMemcpyToSymbol(gpu_cons2, cs_gpu_cons2, sizeof(float));
-    cudaMemcpyToSymbol(gpu_Trecurse, cs_gpu_trecurse, sizeof(float));
-    cudaMemcpyTosymbol(gpu_two_sigma_pow, cs_gpu_two_sigma_pow, sizeof(float));
-    cudaMemcpyToSymbol(gpu_half_pow_pi, cs_gpu_half_pow_pi, sizeof(flaot));
+    cudaMemcpyToSymbol(&gpu_cons, &cs_gpu_cons, sizeof(float));
+    cudaMemcpyToSymbol(&gpu_cons2,&cs_gpu_cons2, sizeof(float));
+    cudaMemcpyToSymbol(&gpu_Trecurse, &cs_gpu_trecurse, sizeof(float));
+    cudaMemcpyToSymbol(&gpu_two_sigma_pow, &cs_gpu_two_sigma_pow, sizeof(float));
+    cudaMemcpyToSymbol(&gpu_half_pow_pi, &cs_gpu_half_pow_pi, sizeof(float));
     dim3 dimGrid(a,b,1);
     dim3 dimBlock(1024,1,1);
 
-    gpu_combined_kernel<<<dimGrid,dimBlock,(2*N+T)*sizeof(float)>>>(N,d_index_i,d_index_j,d_cml_maxtrix,T,d_hist_return);
+    gpu_combined_kernel<<<dimGrid,dimBlock>>>(N,d_index_i,d_index_j,d_cml_maxtrix,T,d_hist_return);
     cudaDeviceSynchronize();
 
     cudaMemcpy(hist_return,d_hist_return, sizeof(float)*c_size,cudaMemcpyDeviceToHost);
@@ -1643,6 +1643,9 @@ void Voting_wrapper(float **CML_Matrix,int N,float *hist_return,int T,int dft_si
     cudaFree(d_hist_return);
     cudaFree(d_index_i);
     cudaFree(d_index_j);
+    delete[] cml_oned_matrix;
+    delete[] index_i;
+    delete[] index_j;
 }
 
 void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,int dft_size_pow,FILE *debug_f,FILE *hist_f,std::vector<voted> &good_Particle){
@@ -1813,9 +1816,12 @@ void List_wrapper(int *inList,FILE *f,FILE *log,FILE *particle_log,int dft_size,
     float error_hist;
     int c_size=local_N*(local_N-1)/2;
     error_hist=cblas_sdot(c_size,hist_Peak,1,hist_Peak,1)+cblas_sdot(c_size,gpu_hist_Peak,1,gpu_hist_Peak,1)-2*cblas_sdot(c_size,gpu_hist_Peak,1,hist_Peak,1);
-    error_hist=sqrt(error_hist/c_szie);
+    error_hist=sqrt(error_hist/c_size);
     printf("error hist is %f\n",error_hist);
-    delete[] gpu_hist_Peak;
+    for (int i=0;i<20;i++){
+	printf("%f\t%f\n",gpu_hist_Peak[i],hist_Peak[i]);
+	}
+    //delete[] gpu_hist_Peak;
     //get voted_value
     int r=4;
 
