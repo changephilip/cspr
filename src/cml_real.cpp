@@ -157,15 +157,19 @@ int main(int argc,char * argv[]){
         cv::Mat image_mrc=cv::Mat(cml_size,cml_size,CV_32FC1,tmp);
 
 
-        cv::Mat image_dft=CML::imdft(image_mrc);
-        cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
-        CML::linearpolar(image_dft,lp_mrc);
+        //cv::Mat image_dft=CML::imdft(image_mrc);
+		cv::Mat B;
+		image_mrc.convertTo(B,CV_8UC1,255,0);
+		cv::GaussianBlur(B,B,cv::Size(35,35),7);
+		cv::normalize(B,B,255.0,0.0,cv::NORM_MINMAX);
+        cv::Mat lp_mrc(B.size(),B.type());
+        CML::linearpolar(B,lp_mrc);
         //cartesian_to_polar(image_dft,lp_mrc,cml_size);
         //polar_to_cartesian(image_dft,lp_mrc,cml_size,cml_size);
         if (i==0 or i==5 or i==43){
             MrcProcess::showimagecpp(image_mrc);
 			//MrcProcess::showimagecpp(MrcProcess::mynorm(image_mrc));
-            MrcProcess::showimagecpp(image_dft);
+            MrcProcess::showimagecpp(B);
 			//MrcProcess::showimagecpp(MrcProcess::mynorm(image_dft));
             MrcProcess::showimagecpp(lp_mrc);
 			//MrcProcess::showimagecpp(MrcProcess::mynorm(lp_mrc));
@@ -174,14 +178,14 @@ int main(int argc,char * argv[]){
 //        MrcProcess::showimagecpp(lpdft_mrc);
         float tmp_comp[SIZE_COMP*SIZE_COMP];
         cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
-        cv::Mat image_comp=cv::Mat(dsize,CV_32FC1);
+        cv::Mat image_comp=cv::Mat(dsize,CV_8UC1);
         cv::resize(lp_mrc,image_comp,dsize);
 //        cv::normalize(lpdft_mrc,lpdft_mrc,0,1,CV_MINMAX);
         CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
         l=0;
         for (j=0;j<SIZE_COMP;j++){
             for (k=0;k<SIZE_COMP;k++){
-                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                tmp_comp[l]=lp_mrc.at<uchar>(j,k);
                 l=l+1;
             }
 
@@ -193,16 +197,16 @@ int main(int argc,char * argv[]){
 		
 		for (j=0;j<SIZE_COMP;j++){
 			for (k=0;k<22;k++){
-				tmp_cut[j][k]=lp_mrc.at<float>(j,k+1);
+				tmp_cut[j][k]=lp_mrc.at<uchar>(j,k+1);
 			}
 		}
-		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
+		cv::Mat image_cut=cv::Mat(cutsize,CV_8UC1,tmp_cut);
 		cv::resize(image_cut,image_comp,dsize);
 		CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
         l=0;
         for (j=0;j<SIZE_COMP;j++){
             for (k=0;k<SIZE_COMP;k++){
-                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                tmp_comp[l]=lp_mrc.at<uchar>(j,k);
                 l=l+1;
             }
 
@@ -233,22 +237,28 @@ int main(int argc,char * argv[]){
         fread(tmp,sizeof(tmp[0]),cml_size_pow,inmrc);
 
         cv::Mat image_mrc=cv::Mat(cml_size,cml_size,CV_32FC1,tmp);
-        cv::Mat image_dft=CML::imdft(image_mrc);
-        cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
+		cv::Mat B;
+
+//        cv::Mat image_dft=CML::imdft(image_mrc);
+        image_mrc.convertTo(B,CV_8UC1,255,0);
+		cv::GaussianBlur(B,B,cv::Size(35,35),7);
+		cv::normalize(B,B,255.0,0.0,cv::NORM_MINMAX);
+
+        cv::Mat lp_mrc(B.size(),B.type());
         //cartesian_to_polar(image_dft,lp_mrc,cml_size);
-        CML::linearpolar(image_dft,lp_mrc);
+        CML::linearpolar(B,lp_mrc);
         //polar_to_cartesian(image_dft,lp_mrc,cml_size,cml_size);
 //        MrcProcess::showimagecpp(lpdft_mrc);
 
 //        cv::normalize(lpdft_mrc,lpdft_mrc,0,1,CV_MINMAX);
         float tmp_comp[SIZE_COMP*SIZE_COMP];
         cv::Size dsize=cv::Size(SIZE_COMP,SIZE_COMP);
-        cv::Mat image_comp=cv::Mat(dsize,CV_32FC1);
+        cv::Mat image_comp=cv::Mat(dsize,CV_8UC1);
         cv::resize(lp_mrc,image_comp,dsize);
         l=0;
         for (j=0;j<SIZE_COMP;j++){
             for (k=0;k<SIZE_COMP;k++){
-                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                tmp_comp[l]=lp_mrc.at<uchar>(j,k);
                 l=l+1;
             }
 
@@ -259,16 +269,16 @@ int main(int argc,char * argv[]){
 		
 		for (j=0;j<SIZE_COMP;j++){
 			for (k=0;k<22;k++){
-				tmp_cut[j][k]=lp_mrc.at<float>(j,k+1);
+				tmp_cut[j][k]=lp_mrc.at<uchar>(j,k+1);
 			}
 		}
-		cv::Mat image_cut=cv::Mat(cutsize,CV_32FC1,tmp_cut);
+		cv::Mat image_cut=cv::Mat(cutsize,CV_8UC1,tmp_cut);
 		cv::resize(image_cut,image_comp,dsize);
 		CML::image_to_mat(image_comp,tmp_comp,SIZE_COMP);
         l=0;
         for (j=0;j<SIZE_COMP;j++){
             for (k=0;k<SIZE_COMP;k++){
-                tmp_comp[l]=lp_mrc.at<float>(j,k);
+                tmp_comp[l]=lp_mrc.at<uchar>(j,k);
                 l=l+1;
             }
 

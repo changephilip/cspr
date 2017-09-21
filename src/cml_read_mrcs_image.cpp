@@ -36,7 +36,7 @@ int main(int argc,char * argv[]){
         exit(EXIT_FAILURE);
     }
 
-
+     
 
 //    dft_size=cv::getOptimalDFTSize(cml_size);
 //    int dft_size_pow=dft_size*dft_size;
@@ -79,9 +79,14 @@ int main(int argc,char * argv[]){
 
 //        cv::Mat afdft_mrc=CML::imdft(image_mrc);
         cv::Mat lp_mrc(image_mrc.size(),image_mrc.type());
+		
         CML::linearpolar(image_mrc,lp_mrc);
-
-            MrcProcess::showimagecpp(image_mrc);
+		cv::Mat B,A;
+		image_mrc.convertTo(B,CV_8UC1,255,0);
+		MrcProcess::showimagecpp(B);
+		cv::GaussianBlur(B,B,cv::Size(43,43),7);
+		cv::normalize(B,B,255.0,0.0,cv::NORM_MINMAX);
+            MrcProcess::showimagecpp(B);
             MrcProcess::showimagecpp(lp_mrc);
 
 
