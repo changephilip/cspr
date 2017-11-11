@@ -1175,6 +1175,169 @@ void stream_wrapper_2_kernel(float *data,int N,int cml_size,float ***help,int *S
     delete[] max_index;
 
 }
+void batch_gemm_test_wrapper(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
+    int c_size=N*(N-1)/2;
+    int a,b;
+    if (N%2==0){
+        a=N-1;
+        b=N/2;
+    }
+    else {
+        a=N;
+        b=(N-1)/2;
+    }
+
+    float *my_sum;
+    float *my_mean;
+    float *my_stdv;
+    int *max_index;
+
+    max_index = new int [c_size];
+
+    my_sum = new float [N*L];
+    my_mean = new float [N*L];
+    my_stdv = new float [N*L];
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<L;j++){
+            my_sum[i*L+j]=help[i][j][0];
+            my_mean[i*L+j]=help[i][j][1];
+            my_stdv[i*L+j]=help[i][j][3];
+        }
+    }
+
+
+    float *d_data;
+    float *d_sum;
+    float *d_mean;
+    float *d_stdv;
+//    int *d_Sx;
+//    int *d_Sy;
+
+    int *d_max_index;
+    float *d_Svalue;
+
+    float *d_buffer;
+
+
+    cudaMalloc((void **)&d_data,sizeof(float)*N*L_power);
+
+    cudaMalloc((void **)&d_sum,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_mean,sizeof(float)*N*L);
+    cudaMalloc((void **)&d_stdv,sizeof(float)*N*L);
+
+//    cudaMalloc((void **)&d_Sx,sizeof(int)*c_size);
+//    cudaMalloc((void **)&d_Sy,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_max_index,sizeof(int)*c_size);
+    cudaMalloc((void **)&d_Svalue,sizeof(float)*c_size);
+
+    cudaMemcpy(d_data,data,sizeof(float)*N*L_power,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_sum,my_sum,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mean,my_mean,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_stdv,my_stdv,sizeof(float)*N*L,cudaMemcpyHostToDevice);
+
+    //d_buffer should be estimated to not over max_memory on GPU;
+    cudaMalloc((void **)&d_buffer,sizeof(float)*a*L_power);
+
+    //allocate mem for max_kernel's buffer,d_p,d_i,length=a*L;
+    //float *d_p;
+    //int *d_pi;
+
+    //cudaMalloc((void **)&d_p,sizeof(float)*L*a);
+    //cudaMalloc((void **)&d_pi,sizeof(int)*L*a);
+
+
+//    int ctr_id1[c_size];
+//    int ctr_id2[c_size];
+    int *ctr_id1;
+    int *ctr_id2;
+    ctr_id1 = new int [c_size];
+    ctr_id2 = new int [c_size];
+    for (int i=0;i<N;i++){
+        for (int j=i+1;j<N;j++){
+            ctr_id1[((2*N-1-i)*i/2+j-i-1)]=i;
+            ctr_id2[((2*N-1-i)*i/2+j-i-1)]=j;
+        }
+    }
+    //**************************************************************************************
+    //dont use stream method,use sgemm_batch method to launch a lot of small matrix multiply
+    //**************************************************************************************
+    cublasHandle_t handle;
+    cublasCreate( &handle);
+    //create pointer array on device to point device memory which contain matrix
+    //Array[] -> Array
+    //gemm(const float *A),gemmbatch(const float * A[])
+
+    cublasSgemmBatched( handle,CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,  )
+    //printf("598\n");
+    cudaStream_t stream[a];
+    cublasHandle_t handle[a];
+    for (int i=0;i<a;i++){
+        cudaStreamCreate(&stream[i]);
+        cublasCreate(&handle[i]);
+        cublasSetStream(handle[i],stream[i]);
+    }
+    //printf("599\n");
+    const float alpha=1.0;
+    const float beta=0.0;
+    dim3 dimBlock(32,32,1);
+
+    //???????buffer???stream???????????????????buffer????????kernel?????
+    for (int i=0;i<b;i++){
+        for (int j=0;j<a;j++){
+            int image_A=ctr_id1[a*i+j];
+            int image_B=ctr_id2[a*i+j];
+//            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[ctr_id2[a*i+j]],L,&d_data[ctr_id1[a*i+j]],L,&beta,&d_buffer[j*L_power],L);
+            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[image_B*L_power],L,&d_data[image_A*L_power],L,&beta,&d_buffer[j*L_power],L);
+            flambda<<<L,L,0,stream[j]>>>(&d_buffer[j*L_power],d_sum,d_mean,d_stdv,image_A,image_B);
+//            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
+            block_max_kernel<<<1,dimBlock,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
+//            my_reduction_kernel1<<<1,L,0,stream[j]>>>(&d_buffer[j*L_power],&d_p[j*L],&d_pi[j*L],L);
+//            my_reduction_kernel2<<<1,1,0,stream[j]>>>(&d_p[j*L],&d_pi[j*L],&d_Svalue[a*i+j],&d_max_index[a*i+j],L);
+        }
+//        cudaDeviceSynchronize();
+    }
+    cudaDeviceSynchronize();
+    cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
+    cudaMemcpy(Svalue,d_Svalue,sizeof(float)*c_size,cudaMemcpyDeviceToHost);
+
+    for(int i=0;i<a;i++){
+        cublasDestroy(handle[i]);
+        cudaStreamDestroy(stream[i]);
+    }
+    int *ctr_L1;
+    int *ctr_L2;
+    ctr_L1 = new int [L_power];
+    ctr_L2 = new int [L_power];
+    for (int i=0;i<L;i++){
+        for (int j=0;j<L;j++){
+            ctr_L1[i*L+j]=i;
+            ctr_L2[i*L+j]=j;
+        }
+    }
+    for(int i=0;i<c_size;i++){
+        Sx[i] = ctr_L1[max_index[i]];
+        Sy[i] = ctr_L2[max_index[i]];
+    }
+    delete[] ctr_L1;
+    delete[] ctr_L2;
+    cudaFree(d_data);
+    cudaFree(d_buffer);
+    cudaFree(d_sum);
+    cudaFree(d_mean);
+    cudaFree(d_stdv);
+    cudaFree(d_max_index);
+    cudaFree(d_Svalue);
+    //cudaFree(d_p);
+    //cudaFree(d_pi);
+    delete[] my_sum;
+    delete[] my_mean;
+    delete[] my_stdv;
+    delete[] ctr_id1;
+    delete[] ctr_id2;
+    delete[] max_index;
+
+}
 
 /*
 void huge_wrapper_kernel(float *data,int N,int cml_size,float ***help,int *Sx,int *Sy,float *Svalue){
