@@ -1298,8 +1298,8 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
     if (globalthread == 0) {
       volatile int *wi = shared_index;
       volatile float *ws = shared_maxvalue;
-      *d_max_value = ws[0];
-      *d_max_index = wi[0];
+      d_max_value[blockid] = ws[0];
+      d_max_index[blockid] = wi[0];
     }
   }
 }
@@ -1351,7 +1351,8 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   float *d_sum;
   float *d_mean;
   float *d_stdv;
-
+  int *d_ctr1;
+  int *d_ctr2;
   int *d_max_index;
   float *d_Svalue;
   const float **d_Marray;
@@ -1366,6 +1367,8 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaMalloc((void **)&d_mean, sizeof(float) * N * L);
   cudaMalloc((void **)&d_stdv, sizeof(float) * N * L);
 
+  cudaMalloc((void **)&d_ctr1, sizeof(int) * c_size);
+  cudaMalloc((void **)&d_ctr2, sizeof(int) * c_size);
   cudaMalloc((void **)&d_Marray, sizeof(float *) * c_size);
   cudaMalloc((void **)&d_Narray, sizeof(float *) * c_size);
   cudaMalloc((void **)&d_Parray, sizeof(float *) * L_power * SizeofBatch);
@@ -1377,16 +1380,18 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaMemcpy(d_sum, my_sum, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr1, ctr_id1,sizeof(int) * c_size,cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr2, ctr_id2,sizeof(int) * c_size,cudaMemcpyHostToDevice);
 
   // d_buffer should be estimated to not over max_memory on GPU;
   cudaMalloc((void **)&d_buffer, sizeof(float) * SizeofBatch * L_power);
   for (int i = 0; i < SizeofBatch; i++) {
-	cudaMemcpy(d_Parray[i], &d_buffer[i * L_power],sizeof(float *),cudaMemcpyDeviceToDevice);
+	cudaMemcpy(&d_Parray[i], &d_buffer[i * L_power],sizeof(float *),cudaMemcpyDeviceToDevice);
   }
   for (int i = 0; i < c_size; i++) {
-    cudaMemcpy(d_Marray[i], &d_data[ctr_id1[i] * L_power],
+    cudaMemcpy(&d_Marray[i], &d_data[ctr_id1[i] * L_power],
                c_size * sizeof(float *), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(d_Narray[i], &d_data[ctr_id2[i] * L_power],
+    cudaMemcpy(&d_Narray[i], &d_data[ctr_id2[i] * L_power],
                c_size * sizeof(float *), cudaMemcpyDeviceToDevice);
   }
 
@@ -1404,57 +1409,27 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   const float alpha = 1.0;
   const float beta = 0.0;
   dim3 dimBlock(32, 32, 1);
+
   // create pointer array on device to point device memory which contain matrix
   // Array[] -> Array
   // gemm(const float *A),gemmbatch(const float * A[])
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       d_Marray[i * SizeofBatch], L, d_Narray[i * SizeofBatch], L,
+                       &d_Marray[i * SizeofBatch], L, &d_Narray[i * SizeofBatch], L,
                        &beta, d_Parray, L, SizeofBatch);
-    flambda_new_kernel<<<SizeofBatch,(32,32)>>>();
+    flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
+                                   d_stdv, d_ctr1, d_ctr2,
+                                   d_Svalue, d_max_index);
   }
   // printf("598\n");
-  cudaStream_t stream[a];
-  cublasHandle_t handle[a];
-  for (int i = 0; i < a; i++) {
-    cudaStreamCreate(&stream[i]);
-    cublasCreate(&handle[i]);
-    cublasSetStream(handle[i], stream[i]);
-  }
-  // printf("599\n");
-  const float alpha = 1.0;
-  const float beta = 0.0;
-  dim3 dimBlock(32, 32, 1);
 
   //???????buffer???stream???????????????????buffer????????kernel?????
-  for (int i = 0; i < b; i++) {
-    for (int j = 0; j < a; j++) {
-      int image_A = ctr_id1[a * i + j];
-      int image_B = ctr_id2[a * i + j];
-      //            cublasSgemm(handle[j],CUBLAS_OP_T,CUBLAS_OP_N,L,L,L,&alpha,&d_data[ctr_id2[a*i+j]],L,&d_data[ctr_id1[a*i+j]],L,&beta,&d_buffer[j*L_power],L);
-      cublasSgemm(handle[j], CUBLAS_OP_T, CUBLAS_OP_N, L, L, L, &alpha,
-                  &d_data[image_B * L_power], L, &d_data[image_A * L_power], L,
-                  &beta, &d_buffer[j * L_power], L);
-      flambda<<<L, L, 0, stream[j]>>>(&d_buffer[j * L_power], d_sum, d_mean,
-                                      d_stdv, image_A, image_B);
-      //            simple_max_kernel<<<1,1,0,stream[j]>>>(&d_buffer[j*L_power],&d_Svalue[a*i+j],&d_max_index[a*i+j]);
-      block_max_kernel<<<1, dimBlock, 0, stream[j]>>>(&d_buffer[j * L_power],
-                                                      &d_Svalue[a * i + j],
-                                                      &d_max_index[a * i + j]);
-      //            my_reduction_kernel1<<<1,L,0,stream[j]>>>(&d_buffer[j*L_power],&d_p[j*L],&d_pi[j*L],L);
-      //            my_reduction_kernel2<<<1,1,0,stream[j]>>>(&d_p[j*L],&d_pi[j*L],&d_Svalue[a*i+j],&d_max_index[a*i+j],L);
-    }
-    //        cudaDeviceSynchronize();
-  }
   cudaDeviceSynchronize();
   cudaMemcpy(max_index, d_max_index, sizeof(int) * c_size,
              cudaMemcpyDeviceToHost);
   cudaMemcpy(Svalue, d_Svalue, sizeof(float) * c_size, cudaMemcpyDeviceToHost);
 
-  for (int i = 0; i < a; i++) {
-    cublasDestroy(handle[i]);
-    cudaStreamDestroy(stream[i]);
-  }
+  cublasDestroy(handle);
   int *ctr_L1;
   int *ctr_L2;
   ctr_L1 = new int[L_power];
