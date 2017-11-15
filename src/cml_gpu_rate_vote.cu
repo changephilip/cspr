@@ -1208,10 +1208,10 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
                                    float *d_stdv, int *d_ctr1, int *d_ctr2,
                                    float *d_max_value, int *d_max_index) {
   __shared__ float shared_maxvalue[1024];
-  __shared__ int shared_index[102]
+  __shared__ int shared_index[1024];
       // use blockid to locate image_a and image_b
       // d_ctr1 and d_ctr2 start from i*batchsize
-      int blockid = blockIdx.x;
+  int blockid = blockIdx.x;
   int image_a = d_ctr1[blockid];
   int image_b = d_ctr2[blockid];
   // use threadid to decide which 16 elements to calculate
@@ -1247,11 +1247,10 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
     for (uint j = 0; j <= 4; j++) {
       threadmax = fmaxf(threadmax, k[i][j]);
       if (threadmax == k[i][j]) {
-        threadindexmax == i *L + j;
+        threadindexmax = i *L + j;
       }
     }
   }
-  int globalthread = threadIdx.x + threadIdx.y * 32;
   shared_maxvalue[globalthread] = threadmax;
   shared_index[globalthread] = threadindexmax;
 
@@ -1297,8 +1296,8 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
       wi[globalthread] = wi[globalthread + 1];
     }
     if (globalthread == 0) {
-      volatile int *wi = si;
-      volatile float *ws = sp;
+      volatile int *wi = shared_index;
+      volatile float *ws = shared_maxvalue;
       *d_max_value = ws[0];
       *d_max_index = wi[0];
     }
@@ -1321,8 +1320,8 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   float *my_stdv;
   int *max_index;
   // a*b=c_size
-  int SizeofBatch = b;
-  int NumofBatch = a;
+  int SizeofBatch = a;
+  int NumofBatch = b;
 
   max_index = new int[c_size];
 
@@ -1355,8 +1354,8 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
 
   int *d_max_index;
   float *d_Svalue;
-  float **d_Marray;
-  float **d_Narray;
+  const float **d_Marray;
+  const float **d_Narray;
   float **d_Parray;
 
   float *d_buffer;
@@ -1366,9 +1365,10 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaMalloc((void **)&d_sum, sizeof(float) * N * L);
   cudaMalloc((void **)&d_mean, sizeof(float) * N * L);
   cudaMalloc((void **)&d_stdv, sizeof(float) * N * L);
+
   cudaMalloc((void **)&d_Marray, sizeof(float *) * c_size);
   cudaMalloc((void **)&d_Narray, sizeof(float *) * c_size);
-  cudaMalloc((void **)&d_Parray, sizeof(float *) * c_size);
+  cudaMalloc((void **)&d_Parray, sizeof(float *) * L_power * SizeofBatch);
 
   cudaMalloc((void **)&d_max_index, sizeof(int) * c_size);
   cudaMalloc((void **)&d_Svalue, sizeof(float) * c_size);
@@ -1379,9 +1379,14 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
   // d_buffer should be estimated to not over max_memory on GPU;
-  cudaMalloc((void **)&d_buffer, sizeof(float) * a * L_power);
+  cudaMalloc((void **)&d_buffer, sizeof(float) * SizeofBatch * L_power);
+  for (int i = 0; i < SizeofBatch; i++) {
+	cudaMemcpy(d_Parray[i], &d_buffer[i * L_power],sizeof(float *),cudaMemcpyDeviceToDevice);
+  }
   for (int i = 0; i < c_size; i++) {
     cudaMemcpy(d_Marray[i], &d_data[ctr_id1[i] * L_power],
+               c_size * sizeof(float *), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(d_Narray[i], &d_data[ctr_id2[i] * L_power],
                c_size * sizeof(float *), cudaMemcpyDeviceToDevice);
   }
 
@@ -1404,9 +1409,9 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   // gemm(const float *A),gemmbatch(const float * A[])
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       d_Marray[i * SizeofBatch], d_Narray[i * SizeofBatch], L,
-                       &beta, d_Parray[i * SizeofBatch], L, SizeofBatch);
-    flambda_new_kernel<<<SizeofBatch,(32,32)>>>(SizeofBatch,(32,32));
+                       d_Marray[i * SizeofBatch], L, d_Narray[i * SizeofBatch], L,
+                       &beta, d_Parray, L, SizeofBatch);
+    flambda_new_kernel<<<SizeofBatch,(32,32)>>>();
   }
   // printf("598\n");
   cudaStream_t stream[a];
