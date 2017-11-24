@@ -1419,7 +1419,7 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
                        &beta, d_Parray, L, SizeofBatch);
     flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
                                    d_stdv, d_ctr1, d_ctr2,
-                                   d_Svalue, d_max_index);
+                                   &d_Svalue[i*SizeofBatch], &d_max_index[i*SizeofBatch]);
   }
   // printf("598\n");
 
@@ -1451,6 +1451,11 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaFree(d_sum);
   cudaFree(d_mean);
   cudaFree(d_stdv);
+  cudaFree(d_ctr1);
+  cudaFree(d_ctr2);
+  cudaFree(d_Marray);
+  cudaFree(d_Narray);
+  cudaFree(d_Parray);
   cudaFree(d_max_index);
   cudaFree(d_Svalue);
   // cudaFree(d_p);
@@ -2037,8 +2042,9 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   Sx = new int[local_N * (local_N - 1) / 2];
   Sy = new int[local_N * (local_N - 1) / 2];
   Svalue = new float[local_N * (local_N - 1) / 2];
-  stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
-                          Svalue);
+//  stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
+ //                         Svalue);
+  batch_gemm_test_wrapper(data_Matrix,local_N,dft_size,pre_Ncc,Sx,Sy,Svalue);
   time_Ncc = time(NULL);
   // get svalue,and apply a threshold
   float *sysSvalue[local_N];
@@ -2158,7 +2164,7 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   time_Voting = time(NULL);
   // a simple deployment of gpu_voting
   float *gpu_hist_Peak = new float[local_N * (local_N - 1) / 2];
-  Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
+ Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
   int time_gpu_voting = time(NULL);
   // compare two hist_value
   float error_hist;
@@ -2171,7 +2177,8 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   for (int i = 0; i < 20; i++) {
     printf("%f\t%f\n", gpu_hist_Peak[i], hist_Peak[i]);
   }
-  // delete[] gpu_hist_Peak;
+//not use gpu_voted result now
+  delete[] gpu_hist_Peak;
   // get voted_value
   int r = 4;
 
