@@ -1419,7 +1419,7 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
                        &beta, d_Parray, L, SizeofBatch);
     flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
                                    d_stdv, d_ctr1, d_ctr2,
-                                   &d_Svalue[i*SizeofBatch], &d_max_index[i*SizeofBatch]);
+                                   d_Svalue, d_max_index);
   }
   // printf("598\n");
 
@@ -1447,7 +1447,6 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   delete[] ctr_L1;
   delete[] ctr_L2;
   cudaFree(d_data);
-  cudaFree(d_buffer);
   cudaFree(d_sum);
   cudaFree(d_mean);
   cudaFree(d_stdv);
@@ -1466,8 +1465,156 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   delete[] ctr_id1;
   delete[] ctr_id2;
   delete[] max_index;
+  
 }
 
+void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,float *Svalue)
+{
+  c_size = N*(N-1)/2;
+  int batchsize;
+  if (N%2==0){
+    batchsize = N;
+  }
+  else{
+    batchsize = N-1;
+  }
+  int NumofBatch = c_size / batchsize;
+
+  //copy main data
+  float *dev_data[N];
+  for (int i=0;i<N;i++){
+    cudaMalloc((void**)&dev_data[i],L_power*sizeof(float));
+  }
+  for (int i =0;i<N;i++){
+    cudaMemcpy(dev_data[i],&data[i*L_power],L_power*sizeof(float),cudaMemcpyHostToDevice);
+  }
+
+  //for control id
+  int *ctr1;
+  int *ctr2;
+  ctr1 = new int [c_size];
+  ctr2 = new int [c_size];
+  for (int i = 0; i < N; i++) {
+    for (int j = i + 1; j < N; j++) {
+      ctr_id1[((2 * N - 1 - i) * i / 2 + j - i - 1)] = i;
+      ctr_id2[((2 * N - 1 - i) * i / 2 + j - i - 1)] = j;
+    }
+  }
+  int *d_ctr1;
+  int *d_ctr2;
+  cudaMalloc((void **)&d_ctr1,c_size*sizeof(int));
+  cudaMalloc((void **)&d_ctr2,c_size*sizeof(int));
+  cduaMemcpy(d_ctr1,ctr1,c_size*sizeof(int),cudaMemcpyHostToDevice);
+  cduaMemcpy(d_ctr2,ctr2,c_size*sizeof(int),cudaMemcpyHostToDevice);
+
+  //for ***help
+  float *my_sum;
+  float *my_mean;
+  float *my_stdv;
+  my_sum = new float[N * L];
+  my_mean = new float[N * L];
+  my_stdv = new float[N * L];
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < L; j++) {
+      my_sum[i * L + j] = help[i][j][0];
+      my_mean[i * L + j] = help[i][j][1];
+      my_stdv[i * L + j] = help[i][j][3];
+    }
+  }
+  float *d_sum;
+  float *d_mean;
+  float *d_stdv;
+  cudaMalloc((void **)&d_sum, sizeof(float) * N * L);
+  cudaMalloc((void **)&d_mean, sizeof(float) * N * L);
+  cudaMalloc((void **)&d_stdv, sizeof(float) * N * L);
+  cudaMemcpy(d_sum, my_sum, sizeof(float) * N * L, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
+
+  //for batch gemm
+  const float **d_Marray,**d_Narray;
+  float **d_Parray;
+  float *dev_buffer[batchsize];
+  for (int i =0;i<batchsize;i++){
+    cudaMalloc((void **)&dev_buffer[i],sizeof(float)*L_power);
+  }
+  cudaMalloc((void **)&d_Marray,c_size*sizeof(float *));
+  cudaMalloc((void **)&d_Narray,c_size*sizeof(float *));
+  cudaMalloc((void **)&d_Parray,batchsize*sizeof(float *));
+  for ( int i=0;i< c_size;i++){
+    cudaMemcpy(d_Marray[i],dev_data[ctr1[i]],sizeof(float *),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Narray[i],dev_data[ctr2[i]],sizeof(float *),cudaMemcpyHostToDevice);
+  }
+  for (int i=0;i<batchsize;i++){
+    cudaMemcpy(d_Parray[i],dev_buffer[i],sizeof(float *),cudaMemcpyHostToDevice);
+  }
+  //for return value
+  float *d_Svalue;
+  int *max_index;
+  max_index = new int [c_size];
+  int *d_max_index;
+  cudaMalloc((void **)&d_max_index, sizeof(int) * c_size);
+  cudaMalloc((void **)&d_Svalue, sizeof(float) * c_size);
+
+  //a little param
+  cublasHandle_t handle;
+  cublasStatus_t cublas_result;
+  const float alpha = 1.0;
+  const float beta = 0.0;
+  dim3 dimBlock(32,32,1);
+  for (int i = 0; i < NumofBatch; i++) {
+    cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
+                       d_Marray[i * SizeofBatch], L, d_Narray[i * SizeofBatch], L,
+                       &beta, d_Parray, L, SizeofBatch);
+    flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
+                                                 d_stdv, d_ctr1, d_ctr2,
+                                                 d_Svalue, d_max_index);
+  }
+  //recieve result
+  cudaDeviceSynchronize();
+  cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
+  cduaMemcpy(Svalue,d_Svalue,sizeof(float) * c_size,cudaMemcpyDeviceToHost);
+  cublasDestroy(handle);
+  //post process
+  int *ctr_L1;
+  int *ctr_L2;
+  ctr_L1 = new int[L_power];
+  ctr_L2 = new int[L_power];
+  for (int i = 0; i < L; i++) {
+    for (int j = 0; j < L; j++) {
+      ctr_L1[i * L + j] = i;
+      ctr_L2[i * L + j] = j;
+    }
+  }
+  for (int i = 0; i < c_size; i++) {
+    Sx[i] = ctr_L1[max_index[i]];
+    Sy[i] = ctr_L2[max_index[i]];
+  }
+  //clear
+  delete[] ctr1;
+  delete[] ctr2;
+  delete[] my_sum;
+  delete[] my_mean;
+  delete[] my_stdv;
+  delete[] max_index;
+  delete[] ctr_L1;
+  delete[] ctr_L2;
+
+  cudaFree(d_ctr1);
+  cudaFree(d_ctr2);
+  cudaFree(d_sum);
+  cudaFree(d_mean);
+  cudaFree(d_stdv);
+  for (int i=0;i<c_size;i++){
+    cudaFree(dev_data[i]);
+  }
+  for (int i=0 ; i<batchsize;i++){
+    cudaFree(dev_buffer[i]);
+  }
+  cudaFree(d_Marray);
+  cudaFree(d_Narray);
+  cudaFree(d_Parray);
+}
 /*
 void huge_wrapper_kernel(float *data,int N,int cml_size,float ***help,int
 *Sx,int *Sy,float *Svalue){
@@ -2042,9 +2189,8 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   Sx = new int[local_N * (local_N - 1) / 2];
   Sy = new int[local_N * (local_N - 1) / 2];
   Svalue = new float[local_N * (local_N - 1) / 2];
-//  stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
- //                         Svalue);
-  batch_gemm_test_wrapper(data_Matrix,local_N,dft_size,pre_Ncc,Sx,Sy,Svalue);
+  stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
+                          Svalue);
   time_Ncc = time(NULL);
   // get svalue,and apply a threshold
   float *sysSvalue[local_N];
@@ -2164,7 +2310,7 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   time_Voting = time(NULL);
   // a simple deployment of gpu_voting
   float *gpu_hist_Peak = new float[local_N * (local_N - 1) / 2];
- Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
+  Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
   int time_gpu_voting = time(NULL);
   // compare two hist_value
   float error_hist;
@@ -2177,8 +2323,7 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   for (int i = 0; i < 20; i++) {
     printf("%f\t%f\n", gpu_hist_Peak[i], hist_Peak[i]);
   }
-//not use gpu_voted result now
-  delete[] gpu_hist_Peak;
+  // delete[] gpu_hist_Peak;
   // get voted_value
   int r = 4;
 
