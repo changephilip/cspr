@@ -1470,7 +1470,7 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
 
 void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,float *Svalue)
 {
-  c_size = N*(N-1)/2;
+  int c_size = N*(N-1)/2;
   int batchsize;
   if (N%2==0){
     batchsize = N;
@@ -1496,16 +1496,16 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   ctr2 = new int [c_size];
   for (int i = 0; i < N; i++) {
     for (int j = i + 1; j < N; j++) {
-      ctr_id1[((2 * N - 1 - i) * i / 2 + j - i - 1)] = i;
-      ctr_id2[((2 * N - 1 - i) * i / 2 + j - i - 1)] = j;
+      ctr1[((2 * N - 1 - i) * i / 2 + j - i - 1)] = i;
+      ctr2[((2 * N - 1 - i) * i / 2 + j - i - 1)] = j;
     }
   }
   int *d_ctr1;
   int *d_ctr2;
   cudaMalloc((void **)&d_ctr1,c_size*sizeof(int));
   cudaMalloc((void **)&d_ctr2,c_size*sizeof(int));
-  cduaMemcpy(d_ctr1,ctr1,c_size*sizeof(int),cudaMemcpyHostToDevice);
-  cduaMemcpy(d_ctr2,ctr2,c_size*sizeof(int),cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr1,ctr1,c_size*sizeof(int),cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr2,ctr2,c_size*sizeof(int),cudaMemcpyHostToDevice);
 
   //for ***help
   float *my_sum;
@@ -1564,16 +1564,16 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   dim3 dimBlock(32,32,1);
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       d_Marray[i * SizeofBatch], L, d_Narray[i * SizeofBatch], L,
-                       &beta, d_Parray, L, SizeofBatch);
-    flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
+                       d_Marray[i * batchsize], L, d_Narray[i * batchsize], L,
+                       &beta, d_Parray, L, batchsize);
+    flambda_new_kernel<<<batchsize,dimBlock>>>(dev_buffer, d_sum, d_mean,
                                                  d_stdv, d_ctr1, d_ctr2,
                                                  d_Svalue, d_max_index);
   }
   //recieve result
   cudaDeviceSynchronize();
   cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
-  cduaMemcpy(Svalue,d_Svalue,sizeof(float) * c_size,cudaMemcpyDeviceToHost);
+  cudaMemcpy(Svalue,d_Svalue,sizeof(float) * c_size,cudaMemcpyDeviceToHost);
   cublasDestroy(handle);
   //post process
   int *ctr_L1;
