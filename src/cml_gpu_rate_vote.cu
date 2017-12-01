@@ -1532,7 +1532,8 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
   //for batch gemm
-  const float **d_Marray,**d_Narray;
+  float **d_Marray;
+  float **d_Narray;
   float **d_Parray;
   float *dev_buffer[batchsize];
   for (int i =0;i<batchsize;i++){
@@ -1564,7 +1565,7 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   dim3 dimBlock(32,32,1);
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       d_Marray[i * batchsize], L, d_Narray[i * batchsize], L,
+                       &d_Marray[i * batchsize], L, &d_Narray[i * batchsize], L,
                        &beta, d_Parray, L, batchsize);
     flambda_new_kernel<<<batchsize,dimBlock>>>(dev_buffer, d_sum, d_mean,
                                                  d_stdv, d_ctr1, d_ctr2,
