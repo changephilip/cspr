@@ -1209,8 +1209,8 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
                                    float *d_max_value, int *d_max_index) {
   __shared__ float shared_maxvalue[1024];
   __shared__ int shared_index[1024];
-      // use blockid to locate image_a and image_b
-      // d_ctr1 and d_ctr2 start from i*batchsize
+  // use blockid to locate image_a and image_b
+  // d_ctr1 and d_ctr2 start from i*batchsize
   int blockid = blockIdx.x;
   int image_a = d_ctr1[blockid];
   int image_b = d_ctr2[blockid];
@@ -1247,7 +1247,7 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
     for (uint j = 0; j <= 4; j++) {
       threadmax = fmaxf(threadmax, k[i][j]);
       if (threadmax == k[i][j]) {
-        threadindexmax = i *L + j;
+        threadindexmax = i * L + j;
       }
     }
   }
@@ -1303,6 +1303,119 @@ __global__ void flambda_new_kernel(float *d_buffer, float *d_sum, float *d_mean,
     }
   }
 }
+__global__ void flambda_new_kernel_fix(float **d_buffer, float *d_sum,
+                                       float *d_mean, float *d_stdv,
+                                       int *d_ctr1, int *d_ctr2,
+                                       float *d_max_value, int *d_max_index) {
+  __shared__ float shared_maxvalue[1024];
+  __shared__ int shared_index[1024];
+  // use blockid to locate image_a and image_b
+  // d_ctr1 and d_ctr2 start from i*batchsize
+  int blockid = blockIdx.x;
+  int image_a = d_ctr1[blockid];
+  int image_b = d_ctr2[blockid];
+  // use threadid to decide which 16 elements to calculate
+  uint m[4];
+  uint n[4];
+  m[0] = threadIdx.x * 4;
+  n[0] = threadIdx.y * 4;
+
+  m[1] = m[0] + 1;
+  m[2] = m[0] + 2;
+  m[3] = m[0] + 3;
+  n[1] = n[0] + 1;
+  n[2] = n[0] + 2;
+  n[3] = n[0] + 3;
+  float k[4][4];
+  //////////////////////////////////////////////////////////////////////
+  // for (int i = m[0]; i <= m[3]; i++) {                             //
+  //   for (int j = n[0]; j <= n[3]; j++) {                           //
+  //     k[i - m[0]][j - n[0]] =                                      //
+  //         (d_buffer[blockid * L_power + i * L + j] +               //
+  //          L * d_mean[image_a * L + i] * d_mean[image_b * L + j] - //
+  //          d_sum[image_a * L + i] * d_mean[image_b * L + j] -      //
+  //          d_mean[image_a * L + i] * d_sum[image_b * L + j]) /     //
+  //         (L * d_stdv[image_a * L + i] * d_stdv[image_b * L + j]); //
+  //   }                                                              //
+  // }                                                                //
+  //////////////////////////////////////////////////////////////////////
+  for (int i = m[0]; i <= m[3]; i++) {
+    for (int j = n[0]; j <= n[3]; j++) {
+      k[i - m[0][j - n[0]]] =
+          (d_buffer[blockid][i * L + j] +
+           L * d_mean[image_a * L + i] * d_mean[image_b * L + j] -
+           d_sum[image_a * L + i] * d_mean[image_b * L + j] -
+           d_mean[image_a * L + i] * d_sum[image_b * L + j]) /
+          (L * d_stdv[image_a * L + i] * d_stdv[image_b * L + j]);
+    }
+  }
+  // prepare for the maxvalue and index
+  float threadmax = 0.0f;
+  uint threadindexmax = 0;
+  uint globalthread = threadIdx.x + threadIdx.y * 32;
+  // cal the max of 16
+  threadmax = k[0][0];
+  for (uint i = 0; i <= 4; i++) {
+    for (uint j = 0; j <= 4; j++) {
+      threadmax = fmaxf(threadmax, k[i][j]);
+      if (threadmax == k[i][j]) {
+        threadindexmax = i * L + j;
+      }
+    }
+  }
+  shared_maxvalue[globalthread] = threadmax;
+  shared_index[globalthread] = threadindexmax;
+
+  __syncthreads();
+
+  for (int activethreads = 1024 >> 1; activethreads > 32; activethreads >>= 1) {
+    if (globalthread < activethreads) {
+      shared_maxvalue[globalthread] =
+          fmaxf(shared_maxvalue[globalthread],
+                shared_maxvalue[globalthread + activethreads]);
+      if (shared_maxvalue[globalthread] ==
+          shared_maxvalue[globalthread + activethreads]) {
+        shared_index[globalthread] = shared_index[globalthread + activethreads];
+      }
+    }
+    __syncthreads();
+  }
+  if (globalthread < 32) {
+    volatile float *ws = shared_maxvalue;
+    volatile int *wi = shared_index;
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 32]);
+    if (ws[globalthread] == ws[globalthread + 32]) {
+      wi[globalthread] = wi[globalthread + 32];
+    }
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 16]);
+    if (ws[globalthread] == ws[globalthread + 16]) {
+      wi[globalthread] = wi[globalthread + 16];
+    }
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 8]);
+    if (ws[globalthread] == ws[globalthread + 8]) {
+      wi[globalthread] = wi[globalthread + 8];
+    }
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 4]);
+    if (ws[globalthread] == ws[globalthread + 4]) {
+      wi[globalthread] = wi[globalthread + 4];
+    }
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 2]);
+    if (ws[globalthread] == ws[globalthread + 2]) {
+      wi[globalthread] = wi[globalthread + 2];
+    }
+    ws[globalthread] = fmaxf(ws[globalthread], ws[globalthread + 1]);
+    if (ws[globalthread] == ws[globalthread + 1]) {
+      wi[globalthread] = wi[globalthread + 1];
+    }
+    if (globalthread == 0) {
+      volatile int *wi = shared_index;
+      volatile float *ws = shared_maxvalue;
+      d_max_value[blockid] = ws[0];
+      d_max_index[blockid] = wi[0];
+    }
+  }
+}
+
 void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
                              int *Sx, int *Sy, float *Svalue) {
   int c_size = N * (N - 1) / 2;
@@ -1380,13 +1493,14 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   cudaMemcpy(d_sum, my_sum, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
-  cudaMemcpy(d_ctr1, ctr_id1,sizeof(int) * c_size,cudaMemcpyHostToDevice);
-  cudaMemcpy(d_ctr2, ctr_id2,sizeof(int) * c_size,cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr1, ctr_id1, sizeof(int) * c_size, cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr2, ctr_id2, sizeof(int) * c_size, cudaMemcpyHostToDevice);
 
   // d_buffer should be estimated to not over max_memory on GPU;
   cudaMalloc((void **)&d_buffer, sizeof(float) * SizeofBatch * L_power);
   for (int i = 0; i < SizeofBatch; i++) {
-	cudaMemcpy(&d_Parray[i], &d_buffer[i * L_power],sizeof(float *),cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&d_Parray[i], &d_buffer[i * L_power], sizeof(float *),
+               cudaMemcpyDeviceToDevice);
   }
   for (int i = 0; i < c_size; i++) {
     cudaMemcpy(&d_Marray[i], &d_data[ctr_id1[i] * L_power],
@@ -1415,11 +1529,11 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   // gemm(const float *A),gemmbatch(const float * A[])
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       &d_Marray[i * SizeofBatch], L, &d_Narray[i * SizeofBatch], L,
-                       &beta, d_Parray, L, SizeofBatch);
-    flambda_new_kernel<<<SizeofBatch,dimBlock>>>(d_buffer, d_sum, d_mean,
-                                   d_stdv, d_ctr1, d_ctr2,
-                                   d_Svalue, d_max_index);
+                       &d_Marray[i * SizeofBatch], L,
+                       &d_Narray[i * SizeofBatch], L, &beta, d_Parray, L,
+                       SizeofBatch);
+    flambda_new_kernel<<<SizeofBatch, dimBlock>>>(
+        d_buffer, d_sum, d_mean, d_stdv, d_ctr1, d_ctr2, d_Svalue, d_max_index);
   }
   // printf("598\n");
 
@@ -1465,35 +1579,34 @@ void batch_gemm_test_wrapper(float *data, int N, int cml_size, float ***help,
   delete[] ctr_id1;
   delete[] ctr_id2;
   delete[] max_index;
-  
 }
 
-void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,float *Svalue)
-{
-  int c_size = N*(N-1)/2;
+void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
+               int *Sy, float *Svalue) {
+  int c_size = N * (N - 1) / 2;
   int batchsize;
-  if (N%2==0){
+  if (N % 2 == 0) {
     batchsize = N;
-  }
-  else{
-    batchsize = N-1;
+  } else {
+    batchsize = N - 1;
   }
   int NumofBatch = c_size / batchsize;
 
-  //copy main data
+  // copy main data
   float *dev_data[N];
-  for (int i=0;i<N;i++){
-    cudaMalloc((void**)&dev_data[i],L_power*sizeof(float));
+  for (int i = 0; i < N; i++) {
+    cudaMalloc((void **)&dev_data[i], L_power * sizeof(float));
   }
-  for (int i =0;i<N;i++){
-    cudaMemcpy(dev_data[i],&data[i*L_power],L_power*sizeof(float),cudaMemcpyHostToDevice);
+  for (int i = 0; i < N; i++) {
+    cudaMemcpy(dev_data[i], &data[i * L_power], L_power * sizeof(float),
+               cudaMemcpyHostToDevice);
   }
 
-  //for control id
+  // for control id
   int *ctr1;
   int *ctr2;
-  ctr1 = new int [c_size];
-  ctr2 = new int [c_size];
+  ctr1 = new int[c_size];
+  ctr2 = new int[c_size];
   for (int i = 0; i < N; i++) {
     for (int j = i + 1; j < N; j++) {
       ctr1[((2 * N - 1 - i) * i / 2 + j - i - 1)] = i;
@@ -1502,12 +1615,12 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   }
   int *d_ctr1;
   int *d_ctr2;
-  cudaMalloc((void **)&d_ctr1,c_size*sizeof(int));
-  cudaMalloc((void **)&d_ctr2,c_size*sizeof(int));
-  cudaMemcpy(d_ctr1,ctr1,c_size*sizeof(int),cudaMemcpyHostToDevice);
-  cudaMemcpy(d_ctr2,ctr2,c_size*sizeof(int),cudaMemcpyHostToDevice);
+  cudaMalloc((void **)&d_ctr1, c_size * sizeof(int));
+  cudaMalloc((void **)&d_ctr2, c_size * sizeof(int));
+  cudaMemcpy(d_ctr1, ctr1, c_size * sizeof(int), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_ctr2, ctr2, c_size * sizeof(int), cudaMemcpyHostToDevice);
 
-  //for ***help
+  // for ***help
   float *my_sum;
   float *my_mean;
   float *my_stdv;
@@ -1531,52 +1644,56 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
-  //for batch gemm
+  // for batch gemm
   float **d_Marray;
   float **d_Narray;
   float **d_Parray;
   float *dev_buffer[batchsize];
-  for (int i =0;i<batchsize;i++){
-    cudaMalloc((void **)&dev_buffer[i],sizeof(float)*L_power);
+  for (int i = 0; i < batchsize; i++) {
+    cudaMalloc((void **)&dev_buffer[i], sizeof(float) * L_power);
   }
-  cudaMalloc((void **)&d_Marray,c_size*sizeof(float *));
-  cudaMalloc((void **)&d_Narray,c_size*sizeof(float *));
-  cudaMalloc((void **)&d_Parray,batchsize*sizeof(float *));
-  for ( int i=0;i< c_size;i++){
-    cudaMemcpy(d_Marray[i],dev_data[ctr1[i]],sizeof(float *),cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Narray[i],dev_data[ctr2[i]],sizeof(float *),cudaMemcpyHostToDevice);
+  cudaMalloc((void **)&d_Marray, c_size * sizeof(float *));
+  cudaMalloc((void **)&d_Narray, c_size * sizeof(float *));
+  cudaMalloc((void **)&d_Parray, batchsize * sizeof(float *));
+  for (int i = 0; i < c_size; i++) {
+    cudaMemcpy(d_Marray[i], dev_data[ctr1[i]], sizeof(float *),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Narray[i], dev_data[ctr2[i]], sizeof(float *),
+               cudaMemcpyHostToDevice);
   }
-  for (int i=0;i<batchsize;i++){
-    cudaMemcpy(d_Parray[i],dev_buffer[i],sizeof(float *),cudaMemcpyHostToDevice);
+  for (int i = 0; i < batchsize; i++) {
+    cudaMemcpy(d_Parray[i], dev_buffer[i], sizeof(float *),
+               cudaMemcpyHostToDevice);
   }
-  //for return value
+  // for return value
   float *d_Svalue;
   int *max_index;
-  max_index = new int [c_size];
+  max_index = new int[c_size];
   int *d_max_index;
   cudaMalloc((void **)&d_max_index, sizeof(int) * c_size);
   cudaMalloc((void **)&d_Svalue, sizeof(float) * c_size);
 
-  //a little param
+  // a little param
   cublasHandle_t handle;
   cublasStatus_t cublas_result;
   const float alpha = 1.0;
   const float beta = 0.0;
-  dim3 dimBlock(32,32,1);
+  dim3 dimBlock(32, 32, 1);
   for (int i = 0; i < NumofBatch; i++) {
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
                        &d_Marray[i * batchsize], L, &d_Narray[i * batchsize], L,
                        &beta, d_Parray, L, batchsize);
-    flambda_new_kernel<<<batchsize,dimBlock>>>(dev_buffer, d_sum, d_mean,
-                                                 d_stdv, d_ctr1, d_ctr2,
-                                                 d_Svalue, d_max_index);
+    flambda_new_kernel_fix<<<batchsize, dimBlock>>>(dev_buffer, d_sum, d_mean,
+                                                d_stdv, d_ctr1, d_ctr2,
+                                                d_Svalue, d_max_index);
   }
-  //recieve result
+  // recieve result
   cudaDeviceSynchronize();
-  cudaMemcpy(max_index,d_max_index,sizeof(int)*c_size,cudaMemcpyDeviceToHost);
-  cudaMemcpy(Svalue,d_Svalue,sizeof(float) * c_size,cudaMemcpyDeviceToHost);
+  cudaMemcpy(max_index, d_max_index, sizeof(int) * c_size,
+             cudaMemcpyDeviceToHost);
+  cudaMemcpy(Svalue, d_Svalue, sizeof(float) * c_size, cudaMemcpyDeviceToHost);
   cublasDestroy(handle);
-  //post process
+  // post process
   int *ctr_L1;
   int *ctr_L2;
   ctr_L1 = new int[L_power];
@@ -1591,7 +1708,7 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
     Sx[i] = ctr_L1[max_index[i]];
     Sy[i] = ctr_L2[max_index[i]];
   }
-  //clear
+  // clear
   delete[] ctr1;
   delete[] ctr2;
   delete[] my_sum;
@@ -1606,10 +1723,10 @@ void batch_new(float *data, int N, int cml_size, float ***help,int *Sx,int *Sy,f
   cudaFree(d_sum);
   cudaFree(d_mean);
   cudaFree(d_stdv);
-  for (int i=0;i<c_size;i++){
+  for (int i = 0; i < c_size; i++) {
     cudaFree(dev_data[i]);
   }
-  for (int i=0 ; i<batchsize;i++){
+  for (int i = 0; i < batchsize; i++) {
     cudaFree(dev_buffer[i]);
   }
   cudaFree(d_Marray);
