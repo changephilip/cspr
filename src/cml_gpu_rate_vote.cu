@@ -1341,7 +1341,7 @@ __global__ void flambda_new_kernel_fix(float **d_buffer, float *d_sum,
   //////////////////////////////////////////////////////////////////////
   for (int i = m[0]; i <= m[3]; i++) {
     for (int j = n[0]; j <= n[3]; j++) {
-      k[i - m[0][j - n[0]]] =
+      k[i - m[0]][j - n[0]] =
           (d_buffer[blockid][i * L + j] +
            L * d_mean[image_a * L + i] * d_mean[image_b * L + j] -
            d_sum[image_a * L + i] * d_mean[image_b * L + j] -
@@ -1586,9 +1586,9 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   int c_size = N * (N - 1) / 2;
   int batchsize;
   if (N % 2 == 0) {
-    batchsize = N;
-  } else {
     batchsize = N - 1;
+  } else {
+    batchsize = N;
   }
   int NumofBatch = c_size / batchsize;
 
@@ -2316,8 +2316,9 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   Sx = new int[local_N * (local_N - 1) / 2];
   Sy = new int[local_N * (local_N - 1) / 2];
   Svalue = new float[local_N * (local_N - 1) / 2];
-  stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
-                          Svalue);
+  // stream_wrapper_2_kernel(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy,
+  //                         Svalue);
+  batch_new(data_Matrix, local_N, dft_size, pre_Ncc, Sx, Sy, Svalue);
   time_Ncc = time(NULL);
   // get svalue,and apply a threshold
   float *sysSvalue[local_N];
@@ -2436,20 +2437,20 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
 
   time_Voting = time(NULL);
   // a simple deployment of gpu_voting
-  float *gpu_hist_Peak = new float[local_N * (local_N - 1) / 2];
-  Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
+  //  float *gpu_hist_Peak = new float[local_N * (local_N - 1) / 2];
+  //Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
   int time_gpu_voting = time(NULL);
   // compare two hist_value
-  float error_hist;
+  //float error_hist;
   int c_size = local_N * (local_N - 1) / 2;
-  error_hist = cblas_sdot(c_size, hist_Peak, 1, hist_Peak, 1) +
-               cblas_sdot(c_size, gpu_hist_Peak, 1, gpu_hist_Peak, 1) -
-               2 * cblas_sdot(c_size, gpu_hist_Peak, 1, hist_Peak, 1);
-  error_hist = sqrt(error_hist / c_size);
-  printf("error hist is %f\n", error_hist);
-  for (int i = 0; i < 20; i++) {
-    printf("%f\t%f\n", gpu_hist_Peak[i], hist_Peak[i]);
-  }
+  // error_hist = cblas_sdot(c_size, hist_Peak, 1, hist_Peak, 1) +
+  //              cblas_sdot(c_size, gpu_hist_Peak, 1, gpu_hist_Peak, 1) -
+  //              2 * cblas_sdot(c_size, gpu_hist_Peak, 1, hist_Peak, 1);
+  // error_hist = sqrt(error_hist / c_size);
+  //printf("error hist is %f\n", error_hist);
+  //for (int i = 0; i < 20; i++) {
+  // printf("%f\t%f\n", gpu_hist_Peak[i], hist_Peak[i]);
+  //}
   // delete[] gpu_hist_Peak;
   // get voted_value
   int r = 4;
