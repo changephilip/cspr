@@ -1644,27 +1644,15 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
-  // for batch gemm
-  float **d_Marray;
-  float **d_Narray;
-  float **d_Parray;
+  //batch buffer,always to be used
   float *dev_buffer[batchsize];
+  float **d_Parray_dev;
   for (int i = 0; i < batchsize; i++) {
     cudaMalloc((void **)&dev_buffer[i], sizeof(float) * L_power);
   }
-  cudaMalloc((void **)&d_Marray, c_size * sizeof(float *));
-  cudaMalloc((void **)&d_Narray, c_size * sizeof(float *));
-  cudaMalloc((void **)&d_Parray, batchsize * sizeof(float *));
-  for (int i = 0; i < c_size; i++) {
-    cudaMemcpy(d_Marray[i], dev_data[ctr1[i]], sizeof(float *),
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Narray[i], dev_data[ctr2[i]], sizeof(float *),
-               cudaMemcpyHostToDevice);
-  }
-  for (int i = 0; i < batchsize; i++) {
-    cudaMemcpy(d_Parray[i], dev_buffer[i], sizeof(float *),
-               cudaMemcpyHostToDevice);
-  }
+  cudaMemcpy(d_Parray_dev,dev_buffer,batchsize*sizeof(float *));
+  // for batch gemm
+
   // for return value
   float *d_Svalue;
   int *max_index;
@@ -1679,13 +1667,35 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   const float alpha = 1.0;
   const float beta = 0.0;
   dim3 dimBlock(32, 32, 1);
+  //do allocate in loop
   for (int i = 0; i < NumofBatch; i++) {
+    float **d_Marray;
+    float **d_Narray;
+    float **d_Marray_dev;
+    float **d_Narray_dev;
+    for (int j=0;j<batchsize;j++){
+      cudaMalloc((void **)&d_Marray[j],sizeof(float)*L_power);
+      cudaMalloc((void **)&d_Narray[j],sizeof(float)*L_power);
+      cduaMemcpy(d_Marray[j],d_data[ctr1[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
+      cduaMemcpy(d_Narray[j],d_data[ctr2[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
+    }
+    cudaMemcpy(d_Marray_dev,d_Marray,sizeof(*d_Marray)*batchsize,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Narray_dev,d_Narray,sizeof(*d_Narray)*batchsize,cudaMemcpyHostToDevice);
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       &d_Marray[i * batchsize], L, &d_Narray[i * batchsize], L,
-                       &beta, d_Parray, L, batchsize);
+                       (const float **)d_Marray_dev, L,(const float **) d_Narray_dev, L,
+                       &beta, d_Parray_dev, L, batchsize);
     flambda_new_kernel_fix<<<batchsize, dimBlock>>>(dev_buffer, d_sum, d_mean,
                                                 d_stdv, d_ctr1, d_ctr2,
                                                 d_Svalue, d_max_index);
+    for (int j=0;j<batchsize;j++){
+      if (d_Marray[i]) cudaFree(d_Marray[i]);
+      if (d_Narray[i]) cudaFree(d_Narray[i]);
+    }
+    if (d_Marray) free(d_Marray);
+    if (d_Narray) free(d_Narray);
+    if (d_Marray_dev) cudaFree(d_Marray_dev);
+    if (d_Narray_dev) cudaFree(d_Narray_dev);
+
   }
   // recieve result
   cudaDeviceSynchronize();
@@ -1729,9 +1739,8 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   for (int i = 0; i < batchsize; i++) {
     cudaFree(dev_buffer[i]);
   }
-  cudaFree(d_Marray);
-  cudaFree(d_Narray);
-  cudaFree(d_Parray);
+  delete[] dev_buffer;
+  cudaFree(d_Parray_dev);
 }
 /*
 void huge_wrapper_kernel(float *data,int N,int cml_size,float ***help,int
