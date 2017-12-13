@@ -1652,7 +1652,9 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   for (int i = 0; i < batchsize; i++) {
     cudaMalloc((void **)&dev_buffer[i], sizeof(float) * L_power);
   }
-
+  cudaMalloc((void **)&d_Parray_dev,sizeof(float *) * batchsize);
+  cudaMemcpy(d_Parray_dev, dev_buffer, batchsize * sizeof(float *),
+             cudaMemcpyHostToDevice);
   // for return value
   float *d_Svalue;
   int *max_index;
@@ -1688,8 +1690,6 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
     cudaMemcpy(d_Marray_dev, d_Marray, sizeof(*d_Marray) * batchsize,
                cudaMemcpyHostToDevice);
     cudaMemcpy(d_Narray_dev, d_Narray, sizeof(*d_Narray) * batchsize,
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Parray_dev, dev_buffer, batchsize * sizeof(float *),
                cudaMemcpyHostToDevice);
     // do batch gemm
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
