@@ -1644,13 +1644,14 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   cudaMemcpy(d_mean, my_mean, sizeof(float) * N * L, cudaMemcpyHostToDevice);
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
-  //batch buffer,always to be used
-  float **dev_buffer;
-  float **d_Parray_dev;
+  // for batch gemm
+  // batch buffer,always to be used
+  float **dev_buffer = 0;
+  dev_buffer = (float **)malloc(sizeof(*dev_buffer) * batchsize);
+  float **d_Parray_dev = NULL;
   for (int i = 0; i < batchsize; i++) {
     cudaMalloc((void **)&dev_buffer[i], sizeof(float) * L_power);
   }
-  // for batch gemm
 
   // for return value
   float *d_Svalue;
@@ -1666,39 +1667,52 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   const float alpha = 1.0;
   const float beta = 0.0;
   dim3 dimBlock(32, 32, 1);
-  //do allocate in loop
+  // do allocate in loop
   for (int i = 0; i < NumofBatch; i++) {
-    float **d_Marray;
-    float **d_Narray;
-    float **d_Marray_dev;
-    float **d_Narray_dev;
-    for (int j=0;j<batchsize;j++){
-      cudaMalloc((void **)&d_Marray[j],sizeof(float)*L_power);
-      cudaMalloc((void **)&d_Narray[j],sizeof(float)*L_power);
-      cudaMemcpy(d_Marray[j],dev_data[ctr1[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
-      cudaMemcpy(d_Narray[j],dev_data[ctr2[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
+    float **d_Marray = 0;
+    float **d_Narray = 0;
+    float **d_Marray_dev = NULL;
+    float **d_Narray_dev = NULL;
+    d_Marray = (float **)malloc(sizeof(*d_Marray) * batchsize);
+    d_Narray = (float **)malloc(sizeof(*d_Narray) * batchsize);
+    for (int j = 0; j < batchsize; j++) {
+      cudaMalloc((void **)&d_Marray[j], sizeof(float) * L_power);
+      cudaMalloc((void **)&d_Narray[j], sizeof(float) * L_power);
+      cudaMemcpy(d_Marray[j], dev_data[ctr1[i * batchsize + j]],
+                 sizeof(float) * L_power, cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_Narray[j], dev_data[ctr2[i * batchsize + j]],
+                 sizeof(float) * L_power, cudaMemcpyDeviceToDevice);
     }
-    cudaMalloc((void **)&d_Marray_dev,sizeof(float *)*batchsize);
-    cudaMalloc((void **)&d_Narray_dev,sizeof(float *)*batchsize);
-    cudaMemcpy(d_Marray_dev,d_Marray,sizeof(*d_Marray)*batchsize,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Narray_dev,d_Narray,sizeof(*d_Narray)*batchsize,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Parray_dev,dev_buffer,batchsize*sizeof(float *),cudaMemcpyHostToDevice);
-    //do batch gemm
+    cudaMalloc((void **)&d_Marray_dev, sizeof(float *) * batchsize);
+    cudaMalloc((void **)&d_Narray_dev, sizeof(float *) * batchsize);
+    cudaMemcpy(d_Marray_dev, d_Marray, sizeof(*d_Marray) * batchsize,
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Narray_dev, d_Narray, sizeof(*d_Narray) * batchsize,
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Parray_dev, dev_buffer, batchsize * sizeof(float *),
+               cudaMemcpyHostToDevice);
+    // do batch gemm
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
-                       (const float **)d_Marray_dev, L,(const float **) d_Narray_dev, L,
-                       &beta, d_Parray_dev, L, batchsize);
+                       (const float **)d_Marray_dev, L,
+                       (const float **)d_Narray_dev, L, &beta, d_Parray_dev, L,
+                       batchsize);
     flambda_new_kernel_fix<<<batchsize, dimBlock>>>(dev_buffer, d_sum, d_mean,
-                                                d_stdv, d_ctr1, d_ctr2,
-                                                d_Svalue, d_max_index);
-    for (int j=0;j<batchsize;j++){
-      if (d_Marray[i]) cudaFree(d_Marray[i]);
-      if (d_Narray[i]) cudaFree(d_Narray[i]);
+                                                    d_stdv, d_ctr1, d_ctr2,
+                                                    d_Svalue, d_max_index);
+    for (int j = 0; j < batchsize; j++) {
+      if (d_Marray[i])
+        cudaFree(d_Marray[i]);
+      if (d_Narray[i])
+        cudaFree(d_Narray[i]);
     }
-    if (d_Marray) free(d_Marray);
-    if (d_Narray) free(d_Narray);
-    if (d_Marray_dev) cudaFree(d_Marray_dev);
-    if (d_Narray_dev) cudaFree(d_Narray_dev);
-
+    if (d_Marray)
+      free(d_Marray);
+    if (d_Narray)
+      free(d_Narray);
+    if (d_Marray_dev)
+      cudaFree(d_Marray_dev);
+    if (d_Narray_dev)
+      cudaFree(d_Narray_dev);
   }
   // recieve result
   cudaDeviceSynchronize();
@@ -2424,10 +2438,9 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
 #pragma omp parallel for
             for (int l = 0; l < T; l++) {
               float alpha_t_alpha12 = Trecurse * l - tmp;
-              tmp_Hist[l] = tmp_Hist[l] +
-                            exp(-1.0 * alpha_t_alpha12 * alpha_t_alpha12 /
-                                two_sigma_pow) /
-                                half_pow_pi;
+              tmp_Hist[l] = tmp_Hist[l] + exp(-1.0 * alpha_t_alpha12 *
+                                              alpha_t_alpha12 / two_sigma_pow) /
+                                              half_pow_pi;
             }
           }
         }
@@ -2441,17 +2454,17 @@ void List_wrapper(int *inList, FILE *f, FILE *log, FILE *particle_log,
   time_Voting = time(NULL);
   // a simple deployment of gpu_voting
   //  float *gpu_hist_Peak = new float[local_N * (local_N - 1) / 2];
-  //Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
+  // Voting_wrapper(cml_Pair_Matrix, local_N, gpu_hist_Peak, T, dft_size);
   int time_gpu_voting = time(NULL);
   // compare two hist_value
-  //float error_hist;
+  // float error_hist;
   int c_size = local_N * (local_N - 1) / 2;
   // error_hist = cblas_sdot(c_size, hist_Peak, 1, hist_Peak, 1) +
   //              cblas_sdot(c_size, gpu_hist_Peak, 1, gpu_hist_Peak, 1) -
   //              2 * cblas_sdot(c_size, gpu_hist_Peak, 1, hist_Peak, 1);
   // error_hist = sqrt(error_hist / c_size);
-  //printf("error hist is %f\n", error_hist);
-  //for (int i = 0; i < 20; i++) {
+  // printf("error hist is %f\n", error_hist);
+  // for (int i = 0; i < 20; i++) {
   // printf("%f\t%f\n", gpu_hist_Peak[i], hist_Peak[i]);
   //}
   // delete[] gpu_hist_Peak;
@@ -2734,9 +2747,9 @@ control_iteration=iteration;control_iteration>0;control_iteration=control_iterat
   /// we use a complex and recursive method to achieve high-quality particles
   ///////////////
   //????vector
-  std::vector<int> Global_Particle(
-      List_Particle,
-      List_Particle + sizeof(List_Particle) / sizeof(*List_Particle));
+  std::vector<int> Global_Particle(List_Particle,
+                                   List_Particle + sizeof(List_Particle) /
+                                                       sizeof(*List_Particle));
   printf("%ld\n", Global_Particle.size());
   //????vector
   std::vector<int> Global_Good_Particle;
