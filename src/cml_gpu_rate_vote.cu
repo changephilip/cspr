@@ -1645,12 +1645,11 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   cudaMemcpy(d_stdv, my_stdv, sizeof(float) * N * L, cudaMemcpyHostToDevice);
 
   //batch buffer,always to be used
-  float *dev_buffer[batchsize];
+  float **dev_buffer;
   float **d_Parray_dev;
   for (int i = 0; i < batchsize; i++) {
     cudaMalloc((void **)&dev_buffer[i], sizeof(float) * L_power);
   }
-  cudaMemcpy(d_Parray_dev,dev_buffer,batchsize*sizeof(float *));
   // for batch gemm
 
   // for return value
@@ -1676,11 +1675,15 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
     for (int j=0;j<batchsize;j++){
       cudaMalloc((void **)&d_Marray[j],sizeof(float)*L_power);
       cudaMalloc((void **)&d_Narray[j],sizeof(float)*L_power);
-      cduaMemcpy(d_Marray[j],d_data[ctr1[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
-      cduaMemcpy(d_Narray[j],d_data[ctr2[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_Marray[j],dev_data[ctr1[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_Narray[j],dev_data[ctr2[i*batchsize+j]],sizeof(float)*L_power,cudaMemcpyDeviceToDevice);
     }
+    cudaMalloc((void **)&d_Marray_dev,sizeof(float *)*batchsize);
+    cudaMalloc((void **)&d_Narray_dev,sizeof(float *)*batchsize);
     cudaMemcpy(d_Marray_dev,d_Marray,sizeof(*d_Marray)*batchsize,cudaMemcpyHostToDevice);
     cudaMemcpy(d_Narray_dev,d_Narray,sizeof(*d_Narray)*batchsize,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_Parray_dev,dev_buffer,batchsize*sizeof(float *),cudaMemcpyHostToDevice);
+    //do batch gemm
     cublasSgemmBatched(handle, CUBLAS_OP_N, CUBLAS_OP_T, L, L, L, &alpha,
                        (const float **)d_Marray_dev, L,(const float **) d_Narray_dev, L,
                        &beta, d_Parray_dev, L, batchsize);
@@ -1739,7 +1742,7 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
   for (int i = 0; i < batchsize; i++) {
     cudaFree(dev_buffer[i]);
   }
-  delete[] dev_buffer;
+  delete dev_buffer;
   cudaFree(d_Parray_dev);
 }
 /*
