@@ -1355,8 +1355,8 @@ __global__ void flambda_new_kernel_fix(float **d_buffer, float *d_sum,
   uint globalthread = threadIdx.x + threadIdx.y * 32;
   // cal the max of 16
   threadmax = k[0][0];
-  for (uint i = 0; i <= 4; i++) {
-    for (uint j = 0; j <= 4; j++) {
+  for (uint i = 0; i < 4; i++) {
+    for (uint j = 0; j < 4; j++) {
       threadmax = fmaxf(threadmax, k[i][j]);
       if (threadmax == k[i][j]) {
         threadindexmax = i * L + j;
@@ -1696,14 +1696,14 @@ void batch_new(float *data, int N, int cml_size, float ***help, int *Sx,
                        (const float **)d_Marray_dev, L,
                        (const float **)d_Narray_dev, L, &beta, d_Parray_dev, L,
                        batchsize);
-    flambda_new_kernel_fix<<<batchsize, dimBlock>>>(dev_buffer, d_sum, d_mean,
+    flambda_new_kernel_fix<<<batchsize, dimBlock>>>(d_Parray_dev, d_sum, d_mean,
                                                     d_stdv, d_ctr1, d_ctr2,
                                                     d_Svalue, d_max_index);
     for (int j = 0; j < batchsize; j++) {
-      if (d_Marray[i])
-        cudaFree(d_Marray[i]);
-      if (d_Narray[i])
-        cudaFree(d_Narray[i]);
+      if (d_Marray[j])
+        cudaFree(d_Marray[j]);
+      if (d_Narray[j])
+        cudaFree(d_Narray[j]);
     }
     if (d_Marray)
       free(d_Marray);
